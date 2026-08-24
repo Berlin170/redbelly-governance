@@ -67,11 +67,24 @@ create table if not exists verified_addresses (
   verified_at timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------- follows
+-- Signed, so the count cannot be inflated by anyone able to reach the API.
+create table if not exists follows (
+  space_id    text not null references spaces(id) on delete cascade,
+  follower    text not null,
+  signature   text not null,
+  created_at  timestamptz not null default now(),
+  primary key (space_id, follower)
+);
+
+create index if not exists follows_space_idx on follows(space_id, created_at desc);
+
 -- ------------------------------------------------------------------ RLS
 alter table spaces             enable row level security;
 alter table proposals          enable row level security;
 alter table votes              enable row level security;
 alter table verified_addresses enable row level security;
+alter table follows            enable row level security;
 
 -- Everything is public to read. Governance that nobody can audit is not
 -- governance. Writes go only through the API routes, which use the service
@@ -87,6 +100,9 @@ create policy "public read votes" on votes for select using (true);
 
 drop policy if exists "public read verified" on verified_addresses;
 create policy "public read verified" on verified_addresses for select using (true);
+
+drop policy if exists "public read follows" on follows;
+create policy "public read follows" on follows for select using (true);
 
 -- --------------------------------------------------------------- seed
 insert into spaces (id, name, about)

@@ -38,6 +38,35 @@ export const proposalTypes = {
   ],
 } as const;
 
+export const followTypes = {
+  Follow: [
+    { name: "from", type: "address" },
+    { name: "space", type: "string" },
+    { name: "following", type: "bool" },
+    { name: "timestamp", type: "uint64" },
+  ],
+} as const;
+
+export interface FollowMessage {
+  from: `0x${string}`;
+  space: string;
+  following: boolean;
+  timestamp: bigint;
+}
+
+export function buildFollowMessage(params: {
+  from: `0x${string}`;
+  space: string;
+  following: boolean;
+}): FollowMessage {
+  return {
+    from: params.from,
+    space: params.space,
+    following: params.following,
+    timestamp: BigInt(Math.floor(Date.now() / 1000)),
+  };
+}
+
 export interface VoteMessage {
   from: `0x${string}`;
   space: string;

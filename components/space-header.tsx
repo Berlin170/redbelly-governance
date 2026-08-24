@@ -2,6 +2,7 @@
 
 import { Globe, Github, MessageCircle, BadgeCheck } from "lucide-react";
 import { SpaceAvatar } from "@/components/space-avatar";
+import { FollowButton } from "@/components/follow-button";
 import { useSpace } from "@/components/space-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -113,8 +114,11 @@ export function SpaceHeader() {
               )}
             </div>
 
-            <div className="flex shrink-0 items-center gap-0.5">
-              {LINKS.map(({ key, icon: Icon, label }) => {
+            <div className="flex shrink-0 items-center gap-2">
+              {space?.id && <FollowButton spaceId={space.id} />}
+
+              <span className="flex items-center gap-0.5">
+                {LINKS.map(({ key, icon: Icon, label }) => {
                 const href = space?.[key];
                 if (!href) return null;
 
@@ -136,8 +140,9 @@ export function SpaceHeader() {
                       </span>
                     )}
                   </a>
-                );
-              })}
+                  );
+                })}
+              </span>
             </div>
           </div>
 
