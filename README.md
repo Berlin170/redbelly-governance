@@ -54,8 +54,9 @@ It creates the tables, row level security policies, and seeds the space.
 cp .env.example .env.local
 ```
 
-Fill in the Supabase URL and keys. Leave `NEXT_PUBLIC_CHAIN_ID=153` to run on
-Redbelly Testnet while you test.
+Fill in the Supabase URL and keys. `NEXT_PUBLIC_CHAIN_ID=151` runs against
+Redbelly Mainnet, which is what the live portal uses. Set it to `153` for
+Redbelly Testnet if you want a rehearsal environment.
 
 `SUPABASE_SERVICE_ROLE_KEY` is the secret key, not the publishable one. It is
 server-only and must never appear in a client component.
@@ -66,12 +67,14 @@ server-only and must never appear in a client component.
 npm run dev
 ```
 
-Open http://localhost:3000. Add Redbelly Testnet to MetaMask (chain ID 153,
-RPC `https://governors.testnet.redbelly.network`) and connect.
+Open http://localhost:3000. Add Redbelly Mainnet to MetaMask (chain ID 151,
+RPC `https://governors.mainnet.redbelly.network`) and connect. On testnet the
+chain ID is 153 and the RPC is `https://governors.testnet.redbelly.network`.
 
 ## Testing one person, one vote locally
 
-Until the on-chain identity registry is wired up, `verified-identity` reads the
+On mainnet `verified-identity` reads Redbelly's access contract and no local
+setup is needed. On testnet there is no such contract, so it falls back to the
 `verified_addresses` table. Add yourself:
 
 ```sql
@@ -81,16 +84,22 @@ values (lower('0xYourAddress'), 'local testing');
 
 Addresses are stored lowercase.
 
-## Before mainnet
+## On mainnet
 
-Three things are deliberately unfinished, and each is a real decision rather
-than a missing line of code.
+The portal runs on Redbelly Mainnet (chain 151).
 
-**Identity verification is a table, not a contract.** `lib/voting-power.ts`
-falls back to a Supabase table you control. That works for testing, but it
-means voters are trusting your list. Point `NEXT_PUBLIC_IDENTITY_REGISTRY` at
-Redbelly's on-chain verification registry before running one-person-one-vote
-for anything that matters.
+**Identity verification is on chain.** `verified-identity` reads
+`isAllowed(address)` on Redbelly's network access contract,
+`0xcb385cD90ca6b219798F57B4a7958897e91A9163`. An address answers true only if
+its owner claimed a Receptor access credential, which requires a passport
+verified by biometric check, so eligibility comes from the protocol rather than
+a list this server keeps. Set `NEXT_PUBLIC_IDENTITY_REGISTRY` only to override
+that address. Note the limit: it proves an address belongs to a verified
+person, not that two addresses are two different people — one credential can
+enable several accounts.
+
+Two things are still deliberately unfinished, and each is a real decision
+rather than a missing line of code.
 
 **Results are not anchored on chain yet.** The `results_hash` and `anchor_tx`
 columns exist for it. Hashing the closed vote set and writing it to a contract

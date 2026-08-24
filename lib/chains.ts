@@ -41,7 +41,11 @@ export const REDBELLY_ACCESS_CONTRACT: Record<number, `0x${string}`> = {
   151: "0xcb385cD90ca6b219798F57B4a7958897e91A9163",
 };
 
-export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 153);
+/**
+ * Defaults to mainnet. A missing env var should fail loudly against the real
+ * chain rather than quietly serve testnet results as if they counted.
+ */
+export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 151);
 
 export const activeChain = CHAIN_ID === 151 ? redbellyMainnet : redbellyTestnet;
 
