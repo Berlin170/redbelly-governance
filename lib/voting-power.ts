@@ -1,6 +1,7 @@
 import { createPublicClient, http, formatEther, getAddress } from "viem";
 import { accessContract, activeChain, RPC_URL } from "./chains";
 import { supabaseAdmin } from "./supabase";
+import { stakedBalance, stakingPools } from "./staking";
 import type { VotingStrategy } from "./types";
 
 const client = createPublicClient({
@@ -110,8 +111,14 @@ export async function getVotingPower(params: {
 
   switch (strategy) {
     case "native-balance": {
-      const wei = await client.getBalance({ address, ...blockArg });
-      return Number(formatEther(wei));
+      // Wallet plus stake. Locking coins in a pool does not stop them being
+      // the holder's coins, and the alternative gives the least say to the
+      // members who committed the most.
+      const [wei, staked] = await Promise.all([
+        client.getBalance({ address, ...blockArg }),
+        stakedBalance(client, address, blockNumber),
+      ]);
+      return Number(formatEther(wei + staked));
     }
 
     case "erc20-balance": {

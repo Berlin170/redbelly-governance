@@ -28,7 +28,11 @@ rather than just save a subscription fee.
 
 ## Voting power strategies
 
-- `native-balance` — RBNT held at the proposal's snapshot block
+- `native-balance` — RBNT held at the proposal's snapshot block, wallet plus
+  anything staked in the pools listed in `lib/staking.ts` (Reddex's no-lock and
+  365-day RBNT pools by default). A staked coin is still the holder's coin, and
+  counting only liquid balances would give the least say to the members who
+  locked for a year.
 - `erc20-balance` — an ERC-20 balance at the snapshot block
 - `verified-identity` — 1 per identity-verified address
 
