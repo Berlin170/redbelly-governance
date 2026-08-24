@@ -5,8 +5,22 @@ import { domain, followTypes } from "@/lib/eip712";
 
 export const dynamic = "force-dynamic";
 
-/** Postgres code for "relation does not exist". */
-const NO_TABLE = "42P01";
+/**
+ * "The follows table is not there yet."
+ *
+ * Postgres says 42P01, but PostgREST answers from its own schema cache and
+ * reports PGRST205 with a different message, which is what actually comes
+ * back through supabase-js. Both are checked, and the message as a last
+ * resort, so the fallback triggers on the error that really arrives.
+ */
+function isMissingTable(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    /schema cache/i.test(error.message ?? "")
+  );
+}
 
 /**
  * Follower counts, and following as a signed action.
@@ -42,7 +56,7 @@ export async function GET(req: NextRequest) {
 
   // The table is created by a migration the operator runs. Until then the
   // page should still show the imported count rather than an error.
-  if (error?.code === NO_TABLE) {
+  if (isMissingTable(error)) {
     return NextResponse.json({ count: imported, following: false, available: false });
   }
 
@@ -98,11 +112,11 @@ export async function POST(req: NextRequest) {
           .eq("follower", follower);
 
     if (error) {
-      const status = error.code === NO_TABLE ? 503 : 500;
-      const msg =
-        error.code === NO_TABLE
-          ? "Following is not enabled yet on this deployment."
-          : error.message;
+      const missing = isMissingTable(error);
+      const status = missing ? 503 : 500;
+      const msg = missing
+        ? "Following is not enabled yet on this deployment."
+        : error.message;
       return NextResponse.json({ error: msg }, { status });
     }
 
