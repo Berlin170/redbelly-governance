@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, Github, MessageCircle } from "lucide-react";
+import { Globe, Github, MessageCircle, BadgeCheck } from "lucide-react";
 import { SpaceAvatar } from "@/components/space-avatar";
 import { useSpace } from "@/components/space-provider";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,6 +58,8 @@ const LINKS = [
 
 export function SpaceHeader() {
   const { space, isLoading } = useSpace();
+  const isCanonical =
+    !!space?.id && space.id === process.env.NEXT_PUBLIC_SPACE_ID;
 
   if (isLoading) {
     return (
@@ -91,9 +93,25 @@ export function SpaceHeader() {
 
         <div className="min-w-0 flex-1 pt-3">
           <div className="flex items-start justify-between gap-4">
-            <h1 className="truncate text-xl font-semibold tracking-tight">
-              {space?.name ?? "Redbelly DAO"}
-            </h1>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <h1 className="truncate text-xl font-semibold tracking-tight">
+                {space?.name ?? "Redbelly DAO"}
+              </h1>
+
+              {/* The tick means this is the space this deployment is
+                  configured to serve, which is the same guarantee Snapshot's
+                  verified badge gives: you are looking at the real one and not
+                  an impostor space with the same name. Here it is settled by
+                  the deployment's own config rather than by a review queue. */}
+              {isCanonical && (
+                <BadgeCheck
+                  className="size-[18px] shrink-0 text-amber-400"
+                  aria-label="Verified space"
+                >
+                  <title>Verified space</title>
+                </BadgeCheck>
+              )}
+            </div>
 
             <div className="flex shrink-0 items-center gap-0.5">
               {LINKS.map(({ key, icon: Icon, label }) => {

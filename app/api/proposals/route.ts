@@ -3,6 +3,7 @@ import { verifyTypedData, getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
 import { domain, proposalTypes } from "@/lib/eip712";
 import { currentBlock } from "@/lib/voting-power";
+import { LIMITS, dayAgo } from "@/lib/limits";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import { resultsFor } from "@/lib/results";
 import type { Proposal, Vote } from "@/lib/types";
@@ -79,8 +80,51 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(choices) || choices.length < 2) {
       return NextResponse.json({ error: "A proposal needs at least two choices." }, { status: 400 });
     }
-    if (choices.length > 1000) {
+    if (choices.length > LIMITS.maxChoices) {
       return NextResponse.json({ error: "Too many choices." }, { status: 400 });
+    }
+
+    if (message.title.length > LIMITS.titleChars) {
+      return NextResponse.json({ error: "Title is too long." }, { status: 400 });
+    }
+    if (message.body.length > LIMITS.bodyChars) {
+      return NextResponse.json({ error: "Body is too long." }, { status: 400 });
+    }
+    if (choices.some((c) => typeof c !== "string" || c.length > LIMITS.choiceChars)) {
+      return NextResponse.json({ error: "A choice is too long." }, { status: 400 });
+    }
+
+    // Spam ceilings. Imported history is excluded (signature is null on it),
+    // so a bulk import cannot exhaust the day's allowance for real authors.
+    const db0 = supabaseAdmin();
+    const since = dayAgo();
+
+    const { count: authorToday } = await db0
+      .from("proposals")
+      .select("id", { count: "exact", head: true })
+      .eq("author", getAddress(message.from))
+      .not("signature", "is", null)
+      .gte("created_at", since);
+
+    if ((authorToday ?? 0) >= LIMITS.perAuthorPerDay) {
+      return NextResponse.json(
+        { error: `This address has already opened ${LIMITS.perAuthorPerDay} proposals today. Try again tomorrow.` },
+        { status: 429 }
+      );
+    }
+
+    const { count: spaceToday } = await db0
+      .from("proposals")
+      .select("id", { count: "exact", head: true })
+      .eq("space_id", message.space)
+      .not("signature", "is", null)
+      .gte("created_at", since);
+
+    if ((spaceToday ?? 0) >= LIMITS.perSpacePerDay) {
+      return NextResponse.json(
+        { error: "This space has reached its proposal limit for today." },
+        { status: 429 }
+      );
     }
     if (!VOTING_SYSTEMS.some((s) => s.value === message.votingSystem)) {
       return NextResponse.json({ error: "Unknown voting system." }, { status: 400 });
