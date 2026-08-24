@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTypedData, getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
 import { domain, voteTypes, canonicalChoice } from "@/lib/eip712";
-import { getVotingPower } from "@/lib/voting-power";
+import {
+  getVotingPower,
+  snapshotDrift,
+  MAX_SNAPSHOT_DRIFT_SECONDS,
+} from "@/lib/voting-power";
 import { validateChoice } from "@/lib/voting";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +54,23 @@ export async function POST(req: NextRequest) {
     // signature the client made will not match what we store.
     if (canonicalChoice(choice) !== message.choice) {
       return NextResponse.json({ error: "Choice encoding mismatch." }, { status: 400 });
+    }
+
+    // Refuse rather than read a snapshot block that belongs to another chain.
+    // Imported proposals are exempt: their block comes from Snapshot and their
+    // created_at is the import time, so the two legitimately disagree.
+    if (proposal.signature && proposal.snapshot_block) {
+      const drift = await snapshotDrift(proposal.snapshot_block, proposal.created_at);
+      if (drift > MAX_SNAPSHOT_DRIFT_SECONDS) {
+        return NextResponse.json(
+          {
+            error:
+              "This proposal's snapshot block does not belong to the current " +
+              "network, so voting power cannot be measured. Create a new proposal.",
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const votingPower = await getVotingPower({

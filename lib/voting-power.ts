@@ -145,3 +145,25 @@ export async function getVotingPower(params: {
 export async function currentBlock(): Promise<number> {
   return Number(await client.getBlockNumber());
 }
+
+/**
+ * Seconds between when a block was mined and when a proposal was written.
+ *
+ * A snapshot block is just an integer, and an integer means something
+ * different on every chain. Switch networks, restore a database, import from
+ * elsewhere, and a proposal can end up pointing at a block that exists but
+ * belongs to a different history — the read succeeds and returns fiction.
+ * A proposal is created at the chain's tip, so its block should carry roughly
+ * the same timestamp. A large drift means the number is not from this chain.
+ */
+export async function snapshotDrift(
+  blockNumber: number,
+  createdAt: string
+): Promise<number> {
+  const block = await client.getBlock({ blockNumber: BigInt(blockNumber) });
+  const mined = Number(block.timestamp) * 1000;
+  return Math.abs(mined - new Date(createdAt).getTime()) / 1000;
+}
+
+/** Drift beyond this means the snapshot block is not from this chain. */
+export const MAX_SNAPSHOT_DRIFT_SECONDS = 2 * 60 * 60;
