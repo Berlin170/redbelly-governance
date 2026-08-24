@@ -1,0 +1,324 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useAccount, useSignTypedData } from "wagmi";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ConnectWallet } from "@/components/connect-wallet";
+import { domain, proposalTypes } from "@/lib/eip712";
+import { VOTING_SYSTEMS } from "@/lib/voting";
+import { accessContract, activeChain } from "@/lib/chains";
+
+/**
+ * Identity voting reads Redbelly's access contract where one is deployed, and
+ * falls back to an operator-controlled list where none is. That fallback is
+ * acceptable on testnet and not on mainnet, so the option is blocked here as
+ * well as in the API — a disabled control that explains itself beats a
+ * request that fails on submit.
+ */
+const IDENTITY_REGISTRY = accessContract();
+import type { VotingStrategy, VotingSystem } from "@/lib/types";
+import { Plus, X } from "lucide-react";
+
+const STRATEGIES: { value: VotingStrategy; label: string; hint: string }[] = [
+  {
+    value: "native-balance",
+    label: "RBNT balance",
+    hint: "Voting power equals the native RBNT held at the snapshot block.",
+  },
+  {
+    value: "erc20-balance",
+    label: "Token balance",
+    hint: "Voting power equals an ERC-20 balance at the snapshot block.",
+  },
+  {
+    value: "verified-identity",
+    label: "Verified identity",
+    hint: "Every identity-verified address gets exactly one vote.",
+  },
+];
+
+export default function CreatePage() {
+  const router = useRouter();
+  const { address, isConnected } = useAccount();
+  const { signTypedDataAsync } = useSignTypedData();
+
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [choices, setChoices] = useState(["Yes", "No", "Abstain"]);
+  const [system, setSystem] = useState<VotingSystem>("single-choice");
+  const [strategy, setStrategy] = useState<VotingStrategy>("native-balance");
+  const [tokenAddress, setTokenAddress] = useState("");
+  const [quorum, setQuorum] = useState("0");
+  const [days, setDays] = useState("5");
+  const [submitting, setSubmitting] = useState(false);
+
+  const systemMeta = VOTING_SYSTEMS.find((s) => s.value === system);
+
+  // Mirrors the server-side guard in lib/voting-power.ts.
+  const identityAvailable = Boolean(IDENTITY_REGISTRY) || activeChain.testnet;
+  const strategyMeta = STRATEGIES.find((s) => s.value === strategy);
+
+  // One person one vote only means anything on top of verified identity
+  function onSystemChange(next: VotingSystem) {
+    setSystem(next);
+    if (next === "one-person-one-vote") setStrategy("verified-identity");
+  }
+
+  async function submit() {
+    if (!address) return;
+
+    const cleaned = choices.map((c) => c.trim()).filter(Boolean);
+    if (!title.trim()) return toast.error("Give the proposal a title.");
+    if (cleaned.length < 2) return toast.error("Add at least two choices.");
+    if (strategy === "erc20-balance" && !tokenAddress.trim()) {
+      return toast.error("Add the token address for this strategy.");
+    }
+
+    const start = Math.floor(Date.now() / 1000);
+    const end = start + Number(days) * 86_400;
+
+    setSubmitting(true);
+    try {
+      const message = {
+        from: address,
+        space: process.env.NEXT_PUBLIC_SPACE_ID ?? "redbelly-dao",
+        title: title.trim(),
+        body: body.trim(),
+        choices: JSON.stringify(cleaned),
+        votingSystem: system,
+        strategy,
+        start: BigInt(start),
+        end: BigInt(end),
+        timestamp: BigInt(Math.floor(Date.now() / 1000)),
+      };
+
+      const signature = await signTypedDataAsync({
+        domain,
+        types: proposalTypes,
+        primaryType: "Proposal",
+        message,
+      });
+
+      const res = await fetch("/api/proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: {
+            ...message,
+            start: start.toString(),
+            end: end.toString(),
+            timestamp: message.timestamp.toString(),
+            tokenAddress: tokenAddress.trim(),
+            quorum,
+          },
+          signature,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "The proposal was not created.");
+
+      toast.success("Proposal published.");
+      router.push(`/proposal/${json.proposal.id}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "The proposal was not created.";
+      toast.error(msg.includes("User rejected") ? "Signature cancelled." : msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">New proposal</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Publishing signs a message. It costs no gas.
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="space-y-5 p-6">
+          <div className="space-y-1.5">
+            <Label htmlFor="title">Title</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Fund the DAO tooling budget for Q4"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="body">Description</Label>
+            <Textarea
+              id="body"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={8}
+              placeholder="What is being decided, and what happens if it passes?"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Choices</Label>
+            {choices.map((choice, i) => (
+              <div key={i} className="flex gap-2">
+                <Input
+                  value={choice}
+                  onChange={(e) => {
+                    const next = [...choices];
+                    next[i] = e.target.value;
+                    setChoices(next);
+                  }}
+                  placeholder={`Choice ${i + 1}`}
+                />
+                {choices.length > 2 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setChoices(choices.filter((_, x) => x !== i))}
+                    aria-label={`Remove choice ${i + 1}`}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setChoices([...choices, ""])}
+            >
+              <Plus className="mr-1.5 size-4" />
+              Add choice
+            </Button>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Voting system</Label>
+            <Select
+              value={system}
+              onValueChange={(v) => onSystemChange(v as VotingSystem)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VOTING_SYSTEMS.map((s) => (
+                  <SelectItem
+                    key={s.value}
+                    value={s.value}
+                    disabled={
+                      s.value === "one-person-one-vote" && !identityAvailable
+                    }
+                  >
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {systemMeta && (
+              <p className="text-xs text-muted-foreground">
+                {systemMeta.description}
+              </p>
+            )}
+            {!identityAvailable && (
+              <p className="text-xs text-status-pending">
+                One person, one vote is unavailable on {activeChain.name}:
+                no Redbelly access contract is deployed there. Set
+                NEXT_PUBLIC_IDENTITY_REGISTRY to enable it.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Voting power</Label>
+            <Select
+              value={strategy}
+              onValueChange={(v) => setStrategy(v as VotingStrategy)}
+              disabled={system === "one-person-one-vote"}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STRATEGIES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {strategyMeta && (
+              <p className="text-xs text-muted-foreground">
+                {system === "one-person-one-vote"
+                  ? "One person, one vote requires verified identity."
+                  : strategyMeta.hint}
+              </p>
+            )}
+          </div>
+
+          {strategy === "erc20-balance" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="token">Token address</Label>
+              <Input
+                id="token"
+                value={tokenAddress}
+                onChange={(e) => setTokenAddress(e.target.value)}
+                placeholder="0x..."
+                className="tabular"
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="days">Voting period (days)</Label>
+              <Input
+                id="days"
+                type="number"
+                min={1}
+                value={days}
+                onChange={(e) => setDays(e.target.value)}
+                className="tabular"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="quorum">Quorum (0 for none)</Label>
+              <Input
+                id="quorum"
+                type="number"
+                min={0}
+                value={quorum}
+                onChange={(e) => setQuorum(e.target.value)}
+                className="tabular"
+              />
+            </div>
+          </div>
+
+          {isConnected ? (
+            <Button onClick={submit} disabled={submitting} className="w-full">
+              {submitting ? "Waiting for signature" : "Sign and publish"}
+            </Button>
+          ) : (
+            <ConnectWallet />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

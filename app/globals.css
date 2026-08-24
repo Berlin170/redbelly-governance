@@ -1,0 +1,182 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  Redbelly governance portal — dark-only theme.
+  Primary red sampled from the Redbelly logo: #F44E4F
+  Swap for the exact brand hex if you get it from their brand kit.
+*/
+
+:root {
+  --radius: 0.625rem;
+
+  /* Base surfaces — deeper than Snapshot's #0E0F10 so this reads as its own product */
+  --background: #0b0c0d;
+  --foreground: #ededee;
+
+  --card: #141517;
+  --card-foreground: #ededee;
+
+  --popover: #17181b;
+  --popover-foreground: #ededee;
+
+  /* Redbelly red. Dark foreground beats white here — ~8:1 contrast vs ~3.4:1 */
+  --primary: #f44e4f;
+  --primary-foreground: #0b0c0d;
+
+  --secondary: #1e2023;
+  --secondary-foreground: #ededee;
+
+  --muted: #1a1c1f;
+  --muted-foreground: #8b8f95;
+
+  --accent: #26282b;
+  --accent-foreground: #ededee;
+
+  /* Destructive sits deliberately off the brand red so "delete" never reads as "Redbelly" */
+  --destructive: #b4342f;
+  --destructive-foreground: #f5f5f5;
+
+  --border: #26282b;
+  --input: #2c2e32;
+  --ring: #f44e4f;
+
+  /* Vote choice colors — for proposal result bars.
+     chart-1 is the brand red so the leading choice carries the identity. */
+  --chart-1: #f44e4f;
+  --chart-2: #4a90d9;
+  --chart-3: #d9a441;
+  --chart-4: #55b78a;
+  --chart-5: #9b7ad9;
+
+  /* Governance status colors */
+  --status-active: #55b78a;
+  --status-pending: #d9a441;
+  --status-closed: #6b7076;
+  --status-passed: #55b78a;
+  --status-rejected: #b4342f;
+
+  --sidebar: #0e0f11;
+  --sidebar-foreground: #ededee;
+  --sidebar-primary: #f44e4f;
+  --sidebar-primary-foreground: #0b0c0d;
+  --sidebar-accent: #1e2023;
+  --sidebar-accent-foreground: #ededee;
+  --sidebar-border: #212326;
+  --sidebar-ring: #f44e4f;
+}
+
+/* Dark class mirrors root so the theme holds whether or not `dark` is applied */
+.dark {
+  --background: #0b0c0d;
+  --foreground: #ededee;
+  --card: #141517;
+  --card-foreground: #ededee;
+  --popover: #17181b;
+  --popover-foreground: #ededee;
+  --primary: #f44e4f;
+  --primary-foreground: #0b0c0d;
+  --secondary: #1e2023;
+  --secondary-foreground: #ededee;
+  --muted: #1a1c1f;
+  --muted-foreground: #8b8f95;
+  --accent: #26282b;
+  --accent-foreground: #ededee;
+  --destructive: #b4342f;
+  --destructive-foreground: #f5f5f5;
+  --border: #26282b;
+  --input: #2c2e32;
+  --ring: #f44e4f;
+  --chart-1: #f44e4f;
+  --chart-2: #4a90d9;
+  --chart-3: #d9a441;
+  --chart-4: #55b78a;
+  --chart-5: #9b7ad9;
+  --sidebar: #0e0f11;
+  --sidebar-foreground: #ededee;
+  --sidebar-primary: #f44e4f;
+  --sidebar-primary-foreground: #0b0c0d;
+  --sidebar-accent: #1e2023;
+  --sidebar-accent-foreground: #ededee;
+  --sidebar-border: #212326;
+  --sidebar-ring: #f44e4f;
+}
+
+@theme inline {
+  /* Literal family names, not var() indirection: Tailwind v4 resolves
+     @theme inline at parse time, so a runtime CSS variable resolves to
+     nothing here and the font silently falls back. */
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-status-active: var(--status-active);
+  --color-status-pending: var(--status-pending);
+  --color-status-closed: var(--status-closed);
+  --color-status-passed: var(--status-passed);
+  --color-status-rejected: var(--status-rejected);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  body {
+    font-family: var(--font-sans);
+  }
+
+  /* Addresses, balances and vote counts: mono keeps digits and hex aligned
+     in columns, which matters more here than matching the prose face. */
+  .tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+}
