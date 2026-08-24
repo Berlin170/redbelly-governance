@@ -9,9 +9,22 @@ import { TopBar } from "@/components/top-bar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
+const SITE =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://redbelly-governance.vercel.app";
+
 export const metadata: Metadata = {
-  title: "Redbelly DAO — Governance",
+  metadataBase: new URL(SITE),
+  title: {
+    default: "Redbelly DAO — Governance",
+    template: "%s — Redbelly DAO",
+  },
   description: "Proposals and gasless signature voting for the Redbelly DAO.",
+  openGraph: {
+    siteName: "Redbelly DAO",
+    type: "website",
+    url: SITE,
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({
