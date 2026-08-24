@@ -94,9 +94,30 @@ The portal runs on Redbelly Mainnet (chain 151).
 its owner claimed a Receptor access credential, which requires a passport
 verified by biometric check, so eligibility comes from the protocol rather than
 a list this server keeps. Set `NEXT_PUBLIC_IDENTITY_REGISTRY` only to override
-that address. Note the limit: it proves an address belongs to a verified
-person, not that two addresses are two different people — one credential can
-enable several accounts.
+that address.
+
+**The electorate is frozen at the proposal's snapshot block.** `isAllowed` is
+read at that block, not at vote time, so an address credentialed after a vote
+opens cannot join it. Nobody can watch a live tally and mint the addresses
+needed to swing it.
+
+**What is still not proved, and why.** The credential presented to the access
+contract is public calldata, and its `credentialSubject` carries exactly one
+field: `publicAddress`. Sixty consecutive mainnet requests were decoded to
+check — one issuer, no passport hash, no subject DID, and a fresh credential
+UUID per issuance, so nothing on chain links two addresses to one person. The
+passport check happens off chain at the issuer and the on-chain artifact is
+deliberately unlinkable. `verified-identity` therefore means one vote per
+verified address, and someone who holds several credentialed addresses from
+before the snapshot can still vote more than once.
+
+Closing that needs one thing from Redbelly, and it is a much smaller ask than a
+registry address: a per-person nullifier in `RedbellyCredentials` — a
+deterministic value derived from the passport plus a context, identical across
+every address the same person credentials, revealing nothing about them. Add it
+to `credentialSubject`, and the tally can group addresses by nullifier and
+count one vote each. Until then, say "one verified address, one vote" and mean
+it, rather than claiming a property the chain does not carry.
 
 Two things are still deliberately unfinished, and each is a real decision
 rather than a missing line of code.

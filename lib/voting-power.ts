@@ -48,10 +48,18 @@ export function identityRegistryConfigured(): boolean {
  * personhood per address, and a determined holder of several enabled accounts
  * could still vote more than once.
  *
+ * Eligibility is read at the proposal's snapshot block, not at vote time, for
+ * the same reason balances are: the electorate is fixed when the proposal is
+ * created. An address credentialed after a vote opens cannot join it, so
+ * nobody can look at a live tally and mint the addresses needed to swing it.
+ *
  * Testnet has no such contract, so it falls back to a `verified_addresses`
  * table the operator controls — fine for rehearsal, refused on mainnet.
  */
-async function verifiedIdentityPower(voter: string): Promise<number> {
+async function verifiedIdentityPower(
+  voter: string,
+  blockNumber?: number | null
+): Promise<number> {
   const registry = accessContract();
 
   if (!registry && !activeChain.testnet) {
@@ -76,6 +84,7 @@ async function verifiedIdentityPower(voter: string): Promise<number> {
       ] as const,
       functionName: "isAllowed",
       args: [getAddress(voter)],
+      ...(blockNumber ? { blockNumber: BigInt(blockNumber) } : {}),
     });
     return isAllowed ? 1 : 0;
   }
@@ -126,7 +135,7 @@ export async function getVotingPower(params: {
     }
 
     case "verified-identity":
-      return verifiedIdentityPower(voter);
+      return verifiedIdentityPower(voter, blockNumber);
 
     default:
       throw new Error(`Unknown strategy: ${strategy}`);
