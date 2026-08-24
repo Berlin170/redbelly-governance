@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { ConnectWallet } from "@/components/connect-wallet";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileSidebar } from "@/components/app-sidebar";
 import { activeChain } from "@/lib/chains";
 
@@ -46,7 +47,8 @@ export function TopBar() {
               Testnet
             </span>
           )}
-          <ConnectWallet />
+          <ThemeToggle />
+        <ConnectWallet />
         </div>
       </div>
     </header>

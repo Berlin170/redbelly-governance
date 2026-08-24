@@ -4,76 +4,68 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Redbelly governance portal — dark-only theme.
+  Redbelly governance portal.
   Primary red sampled from the Redbelly logo: #F44E4F
-  Swap for the exact brand hex if you get it from their brand kit.
+  :root is the light theme, .dark the dark one. The red is darkened for light
+  surfaces — #f44e4f carries white text at about 3.4:1, which fails, while
+  #d93a3b clears 4.5:1 and still reads as the same brand red.
 */
 
 :root {
   --radius: 0.625rem;
 
-  /* Base surfaces — deeper than Snapshot's #0E0F10 so this reads as its own product */
-  --background: #0b0c0d;
-  --foreground: #ededee;
+  --background: #fbfbfc;
+  --foreground: #16181a;
 
-  --card: #141517;
-  --card-foreground: #ededee;
+  --card: #ffffff;
+  --card-foreground: #16181a;
 
-  --popover: #17181b;
-  --popover-foreground: #ededee;
+  --popover: #ffffff;
+  --popover-foreground: #16181a;
 
-  /* Redbelly red. Dark foreground beats white here — ~8:1 contrast vs ~3.4:1 */
-  --primary: #f44e4f;
-  --primary-foreground: #0b0c0d;
+  --primary: #d93a3b;
+  --primary-foreground: #ffffff;
 
-  --secondary: #1e2023;
-  --secondary-foreground: #ededee;
+  --secondary: #f1f2f4;
+  --secondary-foreground: #16181a;
 
-  --muted: #1a1c1f;
-  --muted-foreground: #8b8f95;
+  --muted: #f4f5f6;
+  --muted-foreground: #5f646b;
 
-  --accent: #26282b;
-  --accent-foreground: #ededee;
+  --accent: #eceef0;
+  --accent-foreground: #16181a;
 
-  /* Destructive sits deliberately off the brand red so "delete" never reads as "Redbelly" */
   --destructive: #b4342f;
-  --destructive-foreground: #f5f5f5;
+  --destructive-foreground: #ffffff;
 
-  --border: #26282b;
-  --input: #2c2e32;
-  --ring: #f44e4f;
+  --border: #e3e5e8;
+  --input: #d8dbdf;
+  --ring: #d93a3b;
 
-  /* Vote choice colors — for proposal result bars.
-     chart-1 is the brand red so the leading choice carries the identity.
-     Validated as a categorical set on the dark card surface: every step sits
-     inside the OKLCH L 0.48-0.67 band, clears the chroma floor, and the worst
-     adjacent pair separates by dE 8.6 under protanopia. Deliberately distinct
-     from the --status-* colors below, so a vote segment can never render the
-     same green that means "Active". */
-  --chart-1: #f44e4f;
-  --chart-2: #4a90d9;
-  --chart-3: #b07d20;
-  --chart-4: #38966e;
-  --chart-5: #9b7ad9;
+  /* Same categorical set as the dark theme, darkened for a white card so the
+     series keeps its identity across themes without losing contrast. */
+  --chart-1: #d93a3b;
+  --chart-2: #2f6fb8;
+  --chart-3: #8a6114;
+  --chart-4: #2a7a58;
+  --chart-5: #7a5cb8;
 
-  /* Governance status colors */
-  --status-active: #55b78a;
-  --status-pending: #d9a441;
+  --status-active: #1f7a55;
+  --status-pending: #946517;
   --status-closed: #6b7076;
-  --status-passed: #55b78a;
+  --status-passed: #1f7a55;
   --status-rejected: #b4342f;
 
-  --sidebar: #0e0f11;
-  --sidebar-foreground: #ededee;
-  --sidebar-primary: #f44e4f;
-  --sidebar-primary-foreground: #0b0c0d;
-  --sidebar-accent: #1e2023;
-  --sidebar-accent-foreground: #ededee;
-  --sidebar-border: #212326;
-  --sidebar-ring: #f44e4f;
+  --sidebar: #f6f7f8;
+  --sidebar-foreground: #16181a;
+  --sidebar-primary: #d93a3b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9ebee;
+  --sidebar-accent-foreground: #16181a;
+  --sidebar-border: #e3e5e8;
+  --sidebar-ring: #d93a3b;
 }
 
-/* Dark class mirrors root so the theme holds whether or not `dark` is applied */
 .dark {
   --background: #0b0c0d;
   --foreground: #ededee;
@@ -107,6 +99,12 @@
   --sidebar-accent-foreground: #ededee;
   --sidebar-border: #212326;
   --sidebar-ring: #f44e4f;
+
+  --status-active: #55b78a;
+  --status-pending: #d9a441;
+  --status-closed: #6b7076;
+  --status-passed: #55b78a;
+  --status-rejected: #b4342f;
 }
 
 @theme inline {

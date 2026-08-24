@@ -36,7 +36,7 @@ function Banner({ url }: { url: string | null | undefined }) {
     <div
       className="h-20 w-full sm:h-28"
       style={{
-        backgroundColor: "#17181b",
+        backgroundColor: "var(--muted)",
         backgroundImage: `
           radial-gradient(circle at 100% 100%, #f44e4f22 0 46px, transparent 46px),
           radial-gradient(circle at 0% 0%,     #f44e4f14 0 46px, transparent 46px),
