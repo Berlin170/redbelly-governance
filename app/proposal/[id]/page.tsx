@@ -221,7 +221,7 @@ export default function ProposalPage({
 
         <div className="space-y-4 lg:sticky lg:top-20">
           {state === "active" && (
-            <VotePanel proposal={proposal} onVoted={load} />
+            <VotePanel proposal={proposal} votes={votes} onVoted={load} />
           )}
           <ResultsPanel
             results={results}

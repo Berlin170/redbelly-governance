@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +11,17 @@ import { ConnectWallet } from "@/components/connect-wallet";
 import { domain, voteTypes, buildVoteMessage } from "@/lib/eip712";
 import { validateChoice, VOTING_SYSTEMS } from "@/lib/voting";
 import { cn } from "@/lib/utils";
-import type { Proposal, VoteChoice } from "@/lib/types";
-import { ArrowDown, ArrowUp, Check } from "lucide-react";
+import { activeChain } from "@/lib/chains";
+import type { Proposal, Vote, VoteChoice } from "@/lib/types";
+import { ArrowDown, ArrowUp, Check, CheckCircle2 } from "lucide-react";
 
 export function VotePanel({
   proposal,
+  votes,
   onVoted,
 }: {
   proposal: Proposal;
+  votes: Vote[];
   onVoted: () => void;
 }) {
   const { address, isConnected } = useAccount();
@@ -37,6 +40,55 @@ export function VotePanel({
   const [ranking, setRanking] = useState<number[]>(
     choices.map((_, i) => i + 1)
   );
+
+  /** The ballot this address already cast, if it has. Votes are upserts, so
+   *  this is an edit rather than a second vote. */
+  const myVote = votes.find(
+    (v) => v.voter.toLowerCase() === (address ?? "").toLowerCase()
+  );
+
+  /** What this address may cast, read before signing rather than after. */
+  const [power, setPower] = useState<number | null>(null);
+  const [powerNote, setPowerNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!address) {
+      setPower(null);
+      setPowerNote(null);
+      return;
+    }
+    let live = true;
+    fetch(`/api/power?proposal=${proposal.id}&voter=${address}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!live) return;
+        setPower(typeof json.power === "number" ? json.power : null);
+        setPowerNote(json.unavailable ?? null);
+      })
+      .catch(() => live && setPowerNote("Voting power could not be read."));
+    return () => {
+      live = false;
+    };
+  }, [address, proposal.id, votes]);
+
+  // Show the existing ballot in the controls, so the panel reflects what this
+  // address has already said instead of presenting a blank form.
+  useEffect(() => {
+    if (!myVote) return;
+    const c = myVote.choice;
+    if (typeof c === "number") setSingle(c);
+    else if (Array.isArray(c)) {
+      if (system === "approval") setApproved(c as number[]);
+      else setRanking(c as number[]);
+    } else if (c && typeof c === "object") {
+      setWeights(
+        Object.fromEntries(
+          Object.entries(c as Record<string, number>).map(([k, v]) => [k, Number(v)])
+        )
+      );
+    }
+    if (myVote.reason) setReason(myVote.reason);
+  }, [myVote, system]);
 
   function currentChoice(): VoteChoice {
     switch (system) {
@@ -129,6 +181,21 @@ export function VotePanel({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {myVote && (
+          <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+            <p className="text-muted-foreground">
+              You voted with{" "}
+              <span className="tabular font-medium text-foreground">
+                {Number(myVote.voting_power).toLocaleString(undefined, {
+                  maximumFractionDigits: 4,
+                })}
+              </span>{" "}
+              power. Your selection is shown below — voting again replaces it.
+            </p>
+          </div>
+        )}
+
         {/* ---------------- single choice / one person one vote ------------ */}
         {(system === "single-choice" || system === "one-person-one-vote") && (
           <div className="space-y-2">
@@ -276,16 +343,47 @@ export function VotePanel({
         </div>
 
         {isConnected ? (
-          <Button onClick={submit} disabled={submitting} className="w-full">
-            {submitting ? "Waiting for signature" : "Sign and vote"}
+          <Button
+            onClick={submit}
+            disabled={submitting || power === 0}
+            className="w-full"
+          >
+            {submitting
+              ? "Waiting for signature"
+              : myVote
+                ? "Change vote"
+                : "Sign and vote"}
           </Button>
         ) : (
           <ConnectWallet />
         )}
 
-        <p className="text-center text-xs text-muted-foreground">
-          Signing costs no gas. Your signature proves the vote is yours.
-        </p>
+        {isConnected && (
+          <div className="space-y-1 text-center text-xs text-muted-foreground">
+            {powerNote ? (
+              <p className="text-destructive">{powerNote}</p>
+            ) : power !== null ? (
+              <p>
+                Your voting power:{" "}
+                <span className="tabular font-medium text-foreground">
+                  {power.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </span>
+                {proposal.strategy === "verified-identity"
+                  ? power > 0
+                    ? " (identity verified)"
+                    : " (not identity verified)"
+                  : ` ${activeChain.nativeCurrency.symbol}`}
+              </p>
+            ) : null}
+            <p>Signing costs no gas. Your signature proves the vote is yours.</p>
+          </div>
+        )}
+
+        {!isConnected && (
+          <p className="text-center text-xs text-muted-foreground">
+            Signing costs no gas. Your signature proves the vote is yours.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
