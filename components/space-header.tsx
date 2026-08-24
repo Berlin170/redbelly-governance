@@ -9,22 +9,32 @@ import { Skeleton } from "@/components/ui/skeleton";
  * Geometric banner drawn in CSS rather than shipped as an image. It keeps the
  * quarter-circle motif of the DAO's existing governance page without adding a
  * remote asset the page has to wait on.
+ *
+ * Deliberately short: the primary job of this screen is finding and voting on
+ * proposals, and every pixel of banner is a pixel of proposal pushed below the
+ * fold. It carries the identity and then gets out of the way.
  */
 function Banner({ url }: { url: string | null | undefined }) {
   if (url) {
     return (
+      // Taller than the drawn fallback because a real banner has a subject to
+      // show. objectPosition sits above centre so the mark and wordmark stay
+      // inside the crop at this width instead of being cut across the middle.
+      // alt is empty on purpose: the space name is the h1 immediately below,
+      // and a screen reader should not hear it twice.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={url}
         alt=""
-        className="h-32 w-full object-cover sm:h-44"
+        className="h-28 w-full object-cover sm:h-36"
+        style={{ objectPosition: "center 40%" }}
       />
     );
   }
 
   return (
     <div
-      className="h-32 w-full sm:h-44"
+      className="h-20 w-full sm:h-28"
       style={{
         backgroundColor: "#17181b",
         backgroundImage: `
@@ -39,17 +49,6 @@ function Banner({ url }: { url: string | null | undefined }) {
   );
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <span className="text-muted-foreground">
-      <span className="tabular font-semibold text-foreground">
-        {value.toLocaleString()}
-      </span>{" "}
-      {label}
-    </span>
-  );
-}
-
 const LINKS = [
   { key: "website", icon: Globe, label: "Website" },
   { key: "twitter", icon: null, label: "X" },
@@ -58,15 +57,18 @@ const LINKS = [
 ] as const;
 
 export function SpaceHeader() {
-  const { space, stats, isLoading } = useSpace();
+  const { space, isLoading } = useSpace();
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-32 w-full rounded-xl sm:h-44" />
-        <div className="space-y-2 px-1">
-          <Skeleton className="h-7 w-56" />
-          <Skeleton className="h-4 w-72" />
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <Skeleton className="h-20 w-full rounded-none sm:h-28" />
+        <div className="flex gap-4 px-5 pb-4">
+          <Skeleton className="-mt-7 size-14 shrink-0 rounded-xl" />
+          <div className="mt-3 space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72" />
+          </div>
         </div>
       </div>
     );
@@ -76,55 +78,56 @@ export function SpaceHeader() {
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <Banner url={space?.banner_url} />
 
-      <div className="px-5 pb-5">
-        {/* Avatar straddles the banner edge, the way space pages usually do. */}
-        <div className="-mt-9 mb-3">
+      {/* Avatar sits beside the title rather than above it, which is what
+          reclaims the vertical space the stacked version was spending. */}
+      <div className="flex items-start gap-4 px-5 pb-4">
+        <div className="-mt-7 shrink-0">
           <SpaceAvatar
             space={space}
-            size={72}
+            size={56}
             className="rounded-xl ring-4 ring-card"
           />
         </div>
 
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {space?.name ?? "Redbelly DAO"}
-        </h1>
+        <div className="min-w-0 flex-1 pt-3">
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="truncate text-xl font-semibold tracking-tight">
+              {space?.name ?? "Redbelly DAO"}
+            </h1>
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          <Stat value={stats?.proposalCount ?? 0} label="proposals" />
-          <Stat value={stats?.voteCount ?? 0} label="votes" />
-          <Stat value={space?.followers_count ?? 0} label="followers" />
-        </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              {LINKS.map(({ key, icon: Icon, label }) => {
+                const href = space?.[key];
+                if (!href) return null;
 
-        {space?.about && (
-          <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-            {space.about}
-          </p>
-        )}
+                return (
+                  <a
+                    key={key}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={label}
+                    aria-label={label}
+                    className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {Icon ? (
+                      <Icon className="size-3.5" />
+                    ) : (
+                      <span className="text-xs font-semibold leading-none">
+                        𝕏
+                      </span>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
 
-        <div className="mt-4 flex items-center gap-1">
-          {LINKS.map(({ key, icon: Icon, label }) => {
-            const href = space?.[key];
-            if (!href) return null;
-
-            return (
-              <a
-                key={key}
-                href={href}
-                target="_blank"
-                rel="noreferrer"
-                title={label}
-                aria-label={label}
-                className="grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                {Icon ? (
-                  <Icon className="size-4" />
-                ) : (
-                  <span className="text-sm font-semibold leading-none">𝕏</span>
-                )}
-              </a>
-            );
-          })}
+          {space?.about && (
+            <p className="mt-1 line-clamp-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              {space.about.replace(/\n+/g, " ")}
+            </p>
+          )}
         </div>
       </div>
     </div>
