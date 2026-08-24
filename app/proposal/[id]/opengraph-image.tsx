@@ -58,7 +58,7 @@ export default async function Image({
           </div>
           <div style={{ fontSize: 28, color: "#52525b" }}>·</div>
           <div style={{ fontSize: 28, color: "#a1a1aa" }}>
-            {count ?? 0} {count === 1 ? "vote" : "votes"}
+            {`${count ?? 0} ${count === 1 ? "vote" : "votes"}`}
           </div>
         </div>
 
