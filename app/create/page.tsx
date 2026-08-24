@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAccount, useSignTypedData } from "wagmi";
+import { useAccount, useBalance, useSignTypedData } from "wagmi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import { ConnectWallet } from "@/components/connect-wallet";
 import { domain, proposalTypes } from "@/lib/eip712";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import { accessContract, activeChain } from "@/lib/chains";
+import { PROPOSAL_THRESHOLD } from "@/lib/limits";
 
 /**
  * Identity voting reads Redbelly's access contract where one is deployed, and
@@ -53,6 +54,14 @@ const STRATEGIES: { value: VotingStrategy; label: string; hint: string }[] = [
 export default function CreatePage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
+
+  // Mirrors the proposal-validation check in the API. Signing is free but not
+  // frictionless, and being told no after the wallet popup is a worse
+  // experience than being told the rule before touching it.
+  const { data: balance } = useBalance({ address });
+  const held = balance ? Number(balance.formatted) : 0;
+  const belowThreshold =
+    PROPOSAL_THRESHOLD > 0 && !!address && !!balance && held < PROPOSAL_THRESHOLD;
   const { signTypedDataAsync } = useSignTypedData();
 
   const [title, setTitle] = useState("");
@@ -311,9 +320,25 @@ export default function CreatePage() {
           </div>
 
           {isConnected ? (
-            <Button onClick={submit} disabled={submitting} className="w-full">
-              {submitting ? "Waiting for signature" : "Sign and publish"}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={submit}
+                disabled={submitting || belowThreshold}
+                className="w-full"
+              >
+                {submitting ? "Waiting for signature" : "Sign and publish"}
+              </Button>
+
+              {belowThreshold && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Opening a proposal requires{" "}
+                  {PROPOSAL_THRESHOLD.toLocaleString()} {activeChain.nativeCurrency.symbol}.
+                  This address holds{" "}
+                  {held.toLocaleString(undefined, { maximumFractionDigits: 4 })}.
+                  Space admins are exempt.
+                </p>
+              )}
+            </div>
           ) : (
             <ConnectWallet />
           )}

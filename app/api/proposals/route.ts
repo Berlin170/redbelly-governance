@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTypedData, getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
 import { domain, proposalTypes } from "@/lib/eip712";
-import { currentBlock } from "@/lib/voting-power";
-import { LIMITS, dayAgo } from "@/lib/limits";
+import { currentBlock, getVotingPower } from "@/lib/voting-power";
+import { LIMITS, dayAgo, PROPOSAL_THRESHOLD } from "@/lib/limits";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import { resultsFor } from "@/lib/results";
 import type { Proposal, Vote } from "@/lib/types";
@@ -143,6 +143,44 @@ export async function POST(req: NextRequest) {
       snapshotBlock = await currentBlock();
     } catch {
       snapshotBlock = null; // RPC unreachable — fall back to live balances
+    }
+
+    // Proposal validation: hold a stake in the space, or be an admin of it.
+    // Checked at the snapshot block like everything else, so an address cannot
+    // borrow the threshold for the length of one transaction and hand it back.
+    if (PROPOSAL_THRESHOLD > 0) {
+      const { data: space } = await db0
+        .from("spaces")
+        .select("admins")
+        .eq("id", message.space)
+        .maybeSingle();
+
+      const admins: string[] = (space?.admins ?? []).map((a: string) =>
+        a.toLowerCase()
+      );
+      const isAdmin = admins.includes(message.from.toLowerCase());
+
+      if (!isAdmin) {
+        const held = await getVotingPower({
+          voter: message.from,
+          strategy: message.tokenAddress ? "erc20-balance" : "native-balance",
+          tokenAddress: message.tokenAddress || null,
+          blockNumber: snapshotBlock,
+        });
+
+        if (held < PROPOSAL_THRESHOLD) {
+          return NextResponse.json(
+            {
+              error:
+                `Opening a proposal requires ${PROPOSAL_THRESHOLD.toLocaleString()} RBNT. ` +
+                `This address holds ${held.toLocaleString(undefined, {
+                  maximumFractionDigits: 4,
+                })}.`,
+            },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     const { data, error } = await supabaseAdmin()

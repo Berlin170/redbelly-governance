@@ -24,6 +24,21 @@ export const LIMITS = {
   maxChoices: 1000,
 } as const;
 
+/**
+ * How much RBNT an address must hold to open a proposal.
+ *
+ * The rate limit above caps how fast one address can post; this decides who
+ * may post at all. It is the stronger defence, because it costs something to
+ * hold a stake in the outcome, while signatures are free. Snapshot calls the
+ * same idea proposal validation.
+ *
+ * Set to 0 to let any address propose. Space admins are exempt either way, so
+ * raising it can never lock the DAO out of its own space.
+ */
+export const PROPOSAL_THRESHOLD = Number(
+  process.env.NEXT_PUBLIC_PROPOSAL_THRESHOLD ?? 1000
+);
+
 /** Rolling window start for the per-day counts. */
 export function dayAgo(): string {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
