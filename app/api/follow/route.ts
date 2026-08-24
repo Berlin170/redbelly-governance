@@ -49,10 +49,15 @@ export async function GET(req: NextRequest) {
 
   const imported = spaceRow?.followers_count ?? 0;
 
+  // limit(0) rather than head:true. A head request throws away the response
+  // body, and PostgREST puts the "no such table" code in the body — so the
+  // missing-table check below never saw it and the endpoint claimed following
+  // was available before the migration had run.
   const { count, error } = await db
     .from("follows")
-    .select("follower", { count: "exact", head: true })
-    .eq("space_id", space);
+    .select("follower", { count: "exact" })
+    .eq("space_id", space)
+    .limit(0);
 
   // The table is created by a migration the operator runs. Until then the
   // page should still show the imported count rather than an error.
