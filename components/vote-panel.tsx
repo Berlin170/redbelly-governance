@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
 import { toast } from "sonner";
@@ -375,13 +376,22 @@ export function VotePanel({
                   : ` ${activeChain.nativeCurrency.symbol}`}
               </p>
             ) : null}
-            <p>Signing costs no gas. Your signature proves the vote is yours.</p>
+            <p>
+              Signing costs no gas. Your signature proves the vote is yours.{" "}
+              <Link href="/safety" className="underline hover:text-foreground">
+                Is this safe?
+              </Link>
+            </p>
           </div>
         )}
 
         {!isConnected && (
           <p className="text-center text-xs text-muted-foreground">
-            Signing costs no gas. Your signature proves the vote is yours.
+            Voting is a signature, not a transaction. No gas, and nothing can
+            be moved.{" "}
+            <Link href="/safety" className="underline hover:text-foreground">
+              How this works
+            </Link>
           </p>
         )}
       </CardContent>
