@@ -52,12 +52,36 @@ export async function GET(req: NextRequest) {
       now <= new Date(p.end_at).getTime()
   ).length;
 
+  const closedCount = rows.filter(
+    (p) => now > new Date(p.end_at).getTime()
+  ).length;
+
+  // Distinct voters, counted across imported and native ballots alike. Only
+  // the address column is read, so this stays one narrow scan rather than
+  // pulling every ballot body just to size a set.
+  const { data: voterRows } = await db
+    .from("votes")
+    .select("voter")
+    .in(
+      "proposal_id",
+      rows.map((p) => p.id)
+    );
+
+  const voterCount = new Set(
+    (voterRows ?? []).map((v) => (v.voter ?? "").toLowerCase())
+  ).size;
+
+  const totalVotes = importedVotes + nativeVotes;
+
   return NextResponse.json({
     space: space as Space,
     stats: {
       proposalCount: rows.length,
-      voteCount: importedVotes + nativeVotes,
+      voteCount: totalVotes,
       activeCount,
+      closedCount,
+      voterCount,
+      avgTurnout: rows.length ? Math.round(totalVotes / rows.length) : 0,
     },
   });
 }

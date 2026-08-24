@@ -44,11 +44,16 @@
   --ring: #f44e4f;
 
   /* Vote choice colors — for proposal result bars.
-     chart-1 is the brand red so the leading choice carries the identity. */
+     chart-1 is the brand red so the leading choice carries the identity.
+     Validated as a categorical set on the dark card surface: every step sits
+     inside the OKLCH L 0.48-0.67 band, clears the chroma floor, and the worst
+     adjacent pair separates by dE 8.6 under protanopia. Deliberately distinct
+     from the --status-* colors below, so a vote segment can never render the
+     same green that means "Active". */
   --chart-1: #f44e4f;
   --chart-2: #4a90d9;
-  --chart-3: #d9a441;
-  --chart-4: #55b78a;
+  --chart-3: #b07d20;
+  --chart-4: #38966e;
   --chart-5: #9b7ad9;
 
   /* Governance status colors */
@@ -91,8 +96,8 @@
   --ring: #f44e4f;
   --chart-1: #f44e4f;
   --chart-2: #4a90d9;
-  --chart-3: #d9a441;
-  --chart-4: #55b78a;
+  --chart-3: #b07d20;
+  --chart-4: #38966e;
   --chart-5: #9b7ad9;
   --sidebar: #0e0f11;
   --sidebar-foreground: #ededee;

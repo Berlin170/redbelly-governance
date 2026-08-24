@@ -44,11 +44,17 @@ export interface Space {
   snapshot_space: string | null;
 }
 
-/** Counts shown on the space header, computed server-side. */
+/** Counts shown on the space header and overview, computed server-side. */
 export interface SpaceStats {
   proposalCount: number;
   voteCount: number;
   activeCount: number;
+  /** Distinct addresses that have ever cast a ballot in this space. */
+  voterCount: number;
+  /** Mean ballots per proposal — the honest read on turnout. */
+  avgTurnout: number;
+  /** Proposals that have closed, used as the denominator for outcomes. */
+  closedCount: number;
 }
 
 export interface Proposal {

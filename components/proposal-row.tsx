@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, MinusCircle, Clock } from "lucide-react";
+import { MinusCircle, ArrowDownToLine } from "lucide-react";
 import { AddressAvatar } from "@/components/address-avatar";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
 import { choiceShares } from "@/lib/results";
+import { outcomeOf } from "@/lib/outcome";
 import {
   proposalState,
   shortAddress,
@@ -22,90 +23,125 @@ const CHART = [
   "var(--chart-5)",
 ];
 
+const color = (i: number) => CHART[i % CHART.length];
+
 /**
- * A single stacked bar showing how the power actually split, rather than one
- * bar per choice. At list density this is the only readable form — it gives
- * the outcome at a glance without stealing the row's height.
+ * The result block: one stacked bar, then the choices that actually mattered
+ * spelled out underneath.
+ *
+ * The bar alone was doing too much work — a row of unlabelled colour segments
+ * tells you a vote was close without telling you what it was close between.
+ * Naming the top two choices costs one line and turns the bar into a legend
+ * for itself.
  */
-function ResultBar({ item }: { item: ProposalListItem }) {
+function ResultSummary({ item }: { item: ProposalListItem }) {
   const shares = choiceShares(item.results);
   const cast = item.results.total > 0;
 
-  return (
-    <div className="w-full sm:w-40">
-      <div className="flex h-1.5 w-full gap-px overflow-hidden rounded-full bg-secondary">
-        {cast &&
-          shares.map((share, i) =>
-            share <= 0 ? null : (
-              <span
-                key={i}
-                style={{
-                  width: `${share}%`,
-                  backgroundColor: CHART[i % CHART.length],
-                }}
-                title={`${item.choices[i]} — ${share.toFixed(1)}%`}
-              />
-            )
-          )}
-      </div>
-      {cast && (
-        <p className="mt-1.5 truncate text-right text-xs text-muted-foreground">
-          <span className="text-foreground">
-            {item.choices[(item.results.winner ?? 1) - 1]}
-          </span>{" "}
-          <span className="tabular">
-            {(shares[(item.results.winner ?? 1) - 1] ?? 0).toFixed(0)}%
-          </span>
+  const ranked = shares
+    .map((share, i) => ({ share, i }))
+    .filter((c) => c.share > 0.05)
+    .sort((a, b) => b.share - a.share);
+
+  const shown = ranked.slice(0, 2);
+  const rest = ranked.length - shown.length;
+
+  const voters = item.results.voterCount || item.vote_count;
+  const showVoters = voters > 0 && voters !== item.vote_count;
+
+  if (!cast) {
+    return (
+      <div className="w-full shrink-0 sm:w-60">
+        <div className="h-1.5 w-full rounded-full bg-secondary" />
+        <p className="mt-2 text-xs text-muted-foreground sm:text-right">
+          No votes cast
         </p>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full shrink-0 sm:w-60">
+      <div
+        className="flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary"
+        role="img"
+        aria-label={ranked
+          .map((c) => `${item.choices[c.i]} ${c.share.toFixed(0)}%`)
+          .join(", ")}
+      >
+        {shares.map((share, i) =>
+          share <= 0 ? null : (
+            <span
+              key={i}
+              style={{ width: `${share}%`, backgroundColor: color(i) }}
+              title={`${item.choices[i]} — ${share.toFixed(1)}%`}
+            />
+          )
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:justify-end">
+        {shown.map((c) => (
+          <span key={c.i} className="inline-flex min-w-0 items-center gap-1.5">
+            <span
+              className="size-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: color(c.i) }}
+            />
+            <span className="max-w-[7.5rem] truncate text-muted-foreground">
+              {item.choices[c.i]}
+            </span>
+            <span className="tabular shrink-0 font-medium text-foreground">
+              {c.share.toFixed(0)}%
+            </span>
+          </span>
+        ))}
+        {rest > 0 && (
+          <span className="text-muted-foreground">+{rest} more</span>
+        )}
+      </div>
+
+      <p className="mt-1 text-xs text-muted-foreground sm:text-right">
+        <span className="tabular">{item.vote_count.toLocaleString()}</span>{" "}
+        {item.vote_count === 1 ? "vote" : "votes"}
+        {showVoters && (
+          <>
+            {" · "}
+            <span className="tabular">{voters.toLocaleString()}</span> voters
+          </>
+        )}
+      </p>
     </div>
   );
 }
 
-function StateIcon({ state }: { state: "active" | "pending" | "closed" }) {
-  if (state === "active") {
-    return (
-      <span className="relative grid size-4 shrink-0 place-items-center">
-        <span className="absolute size-4 animate-ping rounded-full bg-status-active/30" />
-        <span className="size-2 rounded-full bg-status-active" />
-      </span>
-    );
-  }
-  if (state === "pending") {
-    return <Clock className="size-4 shrink-0 text-status-pending" />;
-  }
-  return <CheckCircle2 className="size-4 shrink-0 text-status-closed" />;
-}
-
 export function ProposalRow({ item }: { item: ProposalListItem }) {
   const state = proposalState(item.start_at, item.end_at);
+  const outcome = state === "closed" ? outcomeOf(item, item.results) : undefined;
 
   return (
     <Link
       href={`/proposal/${item.id}`}
-      className="group block border-b border-border px-4 py-4 transition-colors last:border-b-0 hover:bg-accent/40 sm:px-5"
+      className="group relative block border-b border-border px-4 py-4 transition-colors last:border-b-0 hover:bg-accent/30 sm:px-5"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+      {/* Brand rail on hover — cheaper than a shadow and it survives the
+          rounded container clipping the row's own borders. */}
+      <span className="absolute inset-y-0 left-0 w-0.5 scale-y-0 bg-primary transition-transform duration-200 group-hover:scale-y-100" />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2.5">
-            <span className="mt-0.5">
-              <StateIcon state={state} />
-            </span>
-            <h3 className="min-w-0 font-medium leading-snug group-hover:text-primary">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="min-w-0 font-medium leading-snug tracking-tight transition-colors group-hover:text-primary">
               {item.title}
             </h3>
+            <StatusBadge state={state} outcome={outcome} />
           </div>
 
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6.5 text-xs text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <span className="tabular">{shortProposalId(item)}</span>
+
             <span className="inline-flex items-center gap-1.5">
               <AddressAvatar address={item.author} size={16} />
               <span className="tabular">{shortAddress(item.author)}</span>
-            </span>
-
-            <span className="text-border">·</span>
-            <span className="tabular">
-              {item.vote_count} {item.vote_count === 1 ? "vote" : "votes"}
             </span>
 
             <span className="text-border">·</span>
@@ -117,21 +153,22 @@ export function ProposalRow({ item }: { item: ProposalListItem }) {
                   : timeLeft(item.end_at)}
             </span>
 
+            {/* Provenance is a footnote, not a headline. It sits at the end of
+                the metadata in the same weight as everything else there. */}
             {item.source === "snapshot" && (
-              <>
+              <span
+                className="inline-flex items-center gap-1 text-muted-foreground/60"
+                title="Imported from the DAO's Snapshot space — not signed on this portal"
+              >
                 <span className="text-border">·</span>
-                <Badge
-                  variant="outline"
-                  className="px-1 py-0 text-[10px] uppercase tracking-wide text-muted-foreground"
-                >
-                  Imported
-                </Badge>
-              </>
+                <ArrowDownToLine className="size-3" />
+                imported
+              </span>
             )}
           </div>
         </div>
 
-        <ResultBar item={item} />
+        <ResultSummary item={item} />
       </div>
     </Link>
   );

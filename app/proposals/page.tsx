@@ -1,26 +1,99 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Plus } from "lucide-react";
 import { ProposalRow, EmptyRows } from "@/components/proposal-row";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { outcomeOf, type OutcomeKind } from "@/lib/outcome";
 import { useProposals } from "@/lib/use-proposals";
 import { proposalState } from "@/lib/utils";
-import type { ProposalState } from "@/lib/types";
+import type { ProposalListItem } from "@/lib/types";
 
-const TABS = [
-  { value: "active", label: "Active", empty: "Nothing is open for voting right now." },
-  { value: "pending", label: "Upcoming", empty: "No proposals are scheduled." },
-  { value: "closed", label: "Closed", empty: "No proposals have closed yet." },
-] as const;
+type Lane = "all" | "active" | "pending" | "closed";
+type SortKey = "newest" | "oldest" | "votes" | "ending";
+
+const LANES: { value: Lane; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "pending", label: "Upcoming" },
+  { value: "closed", label: "Closed" },
+];
+
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: "newest", label: "Newest" },
+  { value: "oldest", label: "Oldest" },
+  { value: "votes", label: "Most votes" },
+  { value: "ending", label: "Ending soon" },
+];
+
+const OUTCOMES: { value: OutcomeKind | "any"; label: string }[] = [
+  { value: "any", label: "Any outcome" },
+  { value: "passed", label: "Passed" },
+  { value: "rejected", label: "Rejected" },
+  { value: "winner", label: "Elected" },
+  { value: "no-quorum", label: "No quorum" },
+];
+
+const EMPTY: Record<Lane, string> = {
+  all: "No proposals yet.",
+  active: "Nothing is open for voting right now.",
+  pending: "No proposals are scheduled.",
+  closed: "No proposals have closed yet.",
+};
+
+/**
+ * Lifecycle drives the tabs and outcome is a separate control, because they
+ * answer different questions — "can I still vote on this" versus "how did it
+ * land". Folding both into one row of tabs would put every election in a
+ * bucket labelled neither Passed nor Rejected, where nobody would find it.
+ */
+function sortProposals(items: ProposalListItem[], key: SortKey) {
+  const at = (iso: string) => new Date(iso).getTime();
+
+  return [...items].sort((a, b) => {
+    switch (key) {
+      case "oldest":
+        return at(a.created_at) - at(b.created_at);
+      case "votes":
+        return b.vote_count - a.vote_count;
+      case "ending": {
+        // Live proposals first, soonest deadline at the top; everything that
+        // has already closed sinks below them in reverse-chronological order.
+        const now = Date.now();
+        const aLive = at(a.end_at) >= now;
+        const bLive = at(b.end_at) >= now;
+        if (aLive !== bLive) return aLive ? -1 : 1;
+        return aLive
+          ? at(a.end_at) - at(b.end_at)
+          : at(b.end_at) - at(a.end_at);
+      }
+      default:
+        return at(b.created_at) - at(a.created_at);
+    }
+  });
+}
 
 function ProposalsList() {
   const params = useSearchParams();
   const query = (params.get("q") ?? "").trim().toLowerCase();
   const { data: proposals, error, isLoading } = useProposals();
 
-  const filtered = useMemo(() => {
+  const [lane, setLane] = useState<Lane>("all");
+  const [sort, setSort] = useState<SortKey>("newest");
+  const [outcome, setOutcome] = useState<OutcomeKind | "any">("any");
+
+  const searched = useMemo(() => {
     if (!proposals) return [];
     if (!query) return proposals;
     return proposals.filter(
@@ -31,8 +104,31 @@ function ProposalsList() {
     );
   }, [proposals, query]);
 
-  const byState = (state: ProposalState) =>
-    filtered.filter((p) => proposalState(p.start_at, p.end_at) === state);
+  const counts = useMemo(() => {
+    const base: Record<Lane, number> = {
+      all: searched.length,
+      active: 0,
+      pending: 0,
+      closed: 0,
+    };
+    for (const p of searched) base[proposalState(p.start_at, p.end_at)] += 1;
+    return base;
+  }, [searched]);
+
+  const visible = useMemo(() => {
+    let rows = searched.filter(
+      (p) => lane === "all" || proposalState(p.start_at, p.end_at) === lane
+    );
+
+    if (outcome !== "any") {
+      rows = rows.filter((p) => {
+        if (proposalState(p.start_at, p.end_at) !== "closed") return false;
+        return outcomeOf(p, p.results).kind === outcome;
+      });
+    }
+
+    return sortProposals(rows, sort);
+  }, [searched, lane, outcome, sort]);
 
   if (error) {
     return (
@@ -47,62 +143,101 @@ function ProposalsList() {
     return (
       <div className="space-y-2">
         {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-20 w-full rounded-xl" />
+          <Skeleton key={i} className="h-24 w-full rounded-xl" />
         ))}
       </div>
     );
   }
 
-  // Land on whichever tab actually has something in it, so a search that only
-  // matches closed proposals does not open on an empty Active tab.
-  const initial =
-    byState("active").length > 0
-      ? "active"
-      : byState("pending").length > 0
-        ? "pending"
-        : "closed";
+  const filtered = outcome !== "any" || lane !== "all" || query.length > 0;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Proposals</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {query ? (
-            <>
-              <span className="tabular">{filtered.length}</span>{" "}
-              {filtered.length === 1 ? "result" : "results"} for{" "}
-              <span className="text-foreground">&ldquo;{query}&rdquo;</span>
-            </>
-          ) : (
-            "Signature voting on Redbelly. No gas, no subscription."
-          )}
-        </p>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Proposals</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {query ? (
+              <>
+                <span className="tabular">{searched.length}</span>{" "}
+                {searched.length === 1 ? "result" : "results"} for{" "}
+                <span className="text-foreground">&ldquo;{query}&rdquo;</span>
+              </>
+            ) : (
+              "Signature voting on Redbelly. No gas, no subscription."
+            )}
+          </p>
+        </div>
+
+        <Button asChild size="sm" className="gap-1.5">
+          <Link href="/create">
+            <Plus className="size-4" />
+            New proposal
+          </Link>
+        </Button>
       </div>
 
-      <Tabs key={initial} defaultValue={initial}>
-        <TabsList>
-          {TABS.map(({ value, label }) => (
-            <TabsTrigger key={value} value={value}>
-              {label}
-              <span className="tabular ml-1.5 text-xs text-muted-foreground">
-                {byState(value).length}
-              </span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {/* Filters live in one row above the list, so the controls that change
+          what you see never get separated from the thing they change. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={lane} onValueChange={(v) => setLane(v as Lane)}>
+          <TabsList>
+            {LANES.map(({ value, label }) => (
+              <TabsTrigger key={value} value={value}>
+                {label}
+                <span className="tabular ml-1.5 text-xs text-muted-foreground">
+                  {counts[value]}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
-        {TABS.map(({ value, empty }) => (
-          <TabsContent key={value} value={value} className="mt-4">
-            <div className="overflow-hidden rounded-xl border border-border bg-card">
-              {byState(value).length === 0 ? (
-                <EmptyRows message={query ? "No proposals match that search." : empty} />
-              ) : (
-                byState(value).map((p) => <ProposalRow key={p.id} item={p} />)
-              )}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+        <div className="flex items-center gap-2">
+          <Select
+            value={outcome}
+            onValueChange={(v) => setOutcome(v as OutcomeKind | "any")}
+          >
+            <SelectTrigger className="h-8 w-[9.5rem] text-xs" aria-label="Outcome">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {OUTCOMES.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+            <SelectTrigger className="h-8 w-[8.5rem] text-xs" aria-label="Sort by">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORTS.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {visible.length === 0 ? (
+          <EmptyRows
+            message={
+              filtered
+                ? "No proposals match these filters."
+                : EMPTY[lane]
+            }
+          />
+        ) : (
+          visible.map((p) => <ProposalRow key={p.id} item={p} />)
+        )}
+      </div>
     </div>
   );
 }
