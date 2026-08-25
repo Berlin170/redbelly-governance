@@ -1,7 +1,7 @@
 import { createPublicClient, http, formatEther, getAddress } from "viem";
 import { accessContract, activeChain, RPC_URL } from "./chains";
 import { supabaseAdmin } from "./supabase";
-import { stakedBalance, stakingPools } from "./staking";
+import { stakedBalance } from "./staking";
 import type { VotingStrategy } from "./types";
 
 const client = createPublicClient({

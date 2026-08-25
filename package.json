@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --max-warnings=0",
     "import:snapshot": "node scripts/import-snapshot.mjs",
     "test": "tsx scripts/voting.test.ts && tsx scripts/profile-fields.test.ts && tsx scripts/pg-errors.test.ts"
   },
@@ -36,10 +36,13 @@
     "wagmi": "^2.14.11"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.13.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.23",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.23.12",
     "tw-animate-css": "^1.2.4",

@@ -60,7 +60,9 @@ export function ProposalBody({ body }: { body: string }) {
           ),
           hr: () => <hr className="my-5 border-border" />,
           img: (props) => (
-            // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+            // Proposal bodies are markdown from members, so the sizes an
+            // optimised <Image> needs are never known ahead of time.
+            // eslint-disable-next-line @next/next/no-img-element
             <img className="my-3 max-w-full rounded-lg" {...props} alt={props.alt ?? ""} />
           ),
           // Wide tables must scroll inside the card, never widen the page.
