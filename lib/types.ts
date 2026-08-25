@@ -113,6 +113,13 @@ export interface Vote {
   reason: string | null;
   /** Null for imported ballots — they carry no signature over our domain. */
   signature: string | null;
+  /**
+   * Unix seconds from the signed payload. Published alongside the signature
+   * because rebuilding the EIP-712 hash needs it, and a signature nobody can
+   * reconstruct the payload for is not something anyone can check. Null on
+   * ballots cast before migration 006 and on imported history.
+   */
+  signed_at: number | null;
   created_at: string;
 
   source?: "native" | "snapshot";

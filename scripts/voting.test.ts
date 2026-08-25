@@ -22,6 +22,7 @@ function ballot(power: number, choice: Vote["choice"]): Vote {
     voting_power: power,
     reason: null,
     signature: null,
+    signed_at: null,
     created_at: new Date().toISOString(),
   };
 }

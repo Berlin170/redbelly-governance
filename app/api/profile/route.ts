@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTypedData, getAddress, isAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
 import { domain, profileTypes } from "@/lib/eip712";
+import { normalizeProfile, unnormalizedFields } from "@/lib/profile-fields";
+import { MAX_CLOCK_SKEW_SECONDS } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
-
-const NAME_MAX = 40;
-const BIO_MAX = 200;
 
 /** Same missing-table shape the follows endpoint learned the hard way. */
 function isMissingTable(error: { code?: string; message?: string } | null) {
@@ -16,41 +15,6 @@ function isMissingTable(error: { code?: string; message?: string } | null) {
     error.code === "PGRST205" ||
     /schema cache/i.test(error.message ?? "")
   );
-}
-
-/**
- * A handle is only ever a label on an address, never a substitute for it.
- * Anyone can sign the name "Redbelly Foundation", so the UI keeps the address
- * beside the name and this endpoint makes no attempt to police what people
- * call themselves. What the signature buys is narrower and worth having: the
- * name against an address was put there by that address.
- */
-function clean(value: unknown, max: number) {
-  if (typeof value !== "string") return null;
-  // Control characters and the bidi overrides that let a name render as
-  // something other than what is stored.
-  const stripped = value.replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e]/g, "").trim();
-  if (!stripped) return null;
-  return stripped.slice(0, max);
-}
-
-/** Only http(s) images. A javascript: or data: avatar is a script, not a face. */
-function cleanUrl(value: unknown) {
-  const s = clean(value, 500);
-  if (!s) return null;
-  try {
-    const u = new URL(s);
-    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Handles are stored bare, so "@name" and a pasted profile URL both work. */
-function cleanHandle(value: unknown) {
-  const s = clean(value, 40);
-  if (!s) return null;
-  return s.replace(/^@/, "").replace(/^https?:\/\/[^/]+\//, "").replace(/\/$/, "");
 }
 
 /**
@@ -111,19 +75,70 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Signature does not match." }, { status: 401 });
     }
 
+    // What was signed has to be what gets stored. Sanitising after the check
+    // and keeping the sanitised value is how the row and the signature beside
+    // it drifted apart: "@alice" was signed, "alice" was kept, and nobody
+    // could re-verify the result. buildProfileMessage normalises before the
+    // wallet sees the payload, so a genuine client never lands here.
+    const drifted = unnormalizedFields(message);
+    if (drifted.length > 0) {
+      return NextResponse.json(
+        { error: `These fields are not in their stored form: ${drifted.join(", ")}.` },
+        { status: 400 }
+      );
+    }
+
+    const signedAt = Number(message.timestamp);
+    if (!Number.isFinite(signedAt)) {
+      return NextResponse.json({ error: "Profile is missing a timestamp." }, { status: 400 });
+    }
+    if (signedAt > Math.floor(Date.now() / 1000) + MAX_CLOCK_SKEW_SECONDS) {
+      return NextResponse.json(
+        { error: "This profile is dated in the future. Check your device clock." },
+        { status: 400 }
+      );
+    }
+
     const address = getAddress(message.from);
+    const db = supabaseAdmin();
+
+    // Same floor the votes table keeps. Profile signatures are not published,
+    // so a replay needs a copy that is not easy to come by — but an address
+    // that can only ever move its profile forwards costs one indexed read.
+    const { data: prior, error: priorErr } = await db
+      .from("profiles")
+      .select("signed_at")
+      .eq("address", address)
+      .maybeSingle();
+
+    if (isMissingTable(priorErr)) {
+      return NextResponse.json(
+        { error: "Profiles are not enabled yet on this deployment." },
+        { status: 503 }
+      );
+    }
+    if (prior?.signed_at != null && signedAt <= Number(prior.signed_at)) {
+      return NextResponse.json(
+        { error: "This profile has already been saved. Sign again to change it." },
+        { status: 409 }
+      );
+    }
+
+    const fields = normalizeProfile(message);
     const row = {
       address,
-      display_name: clean(message.displayName, NAME_MAX),
-      bio: clean(message.bio, BIO_MAX),
-      avatar_url: cleanUrl(message.avatar),
-      twitter: cleanHandle(message.twitter),
-      github: cleanHandle(message.github),
+      // Empty is absent in the table and "" in the signed payload; the two
+      // spellings mean the same thing and only the column is picky.
+      display_name: fields.displayName || null,
+      bio: fields.bio || null,
+      avatar_url: fields.avatar || null,
+      twitter: fields.twitter || null,
+      github: fields.github || null,
       signature,
+      signed_at: signedAt,
       updated_at: new Date().toISOString(),
     };
 
-    const db = supabaseAdmin();
     const { error } = await db.from("profiles").upsert(row, { onConflict: "address" });
 
     if (error) {

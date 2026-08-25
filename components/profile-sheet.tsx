@@ -18,12 +18,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AddressAvatar } from "@/components/address-avatar";
 import { domain, profileTypes, buildProfileMessage } from "@/lib/eip712";
+import { PROFILE_LIMITS } from "@/lib/profile-fields";
 import { useProfile } from "@/lib/use-profiles";
 import { shortAddress } from "@/lib/utils";
 import { Upload, Loader2, X } from "lucide-react";
 
-const NAME_MAX = 40;
-const BIO_MAX = 200;
+// The same numbers the signer truncates to. Kept in one place so the counter
+// under the field cannot promise room that normalisation then takes away.
+const NAME_MAX = PROFILE_LIMITS.name;
+const BIO_MAX = PROFILE_LIMITS.bio;
 
 /**
  * Set up how you appear on this portal.

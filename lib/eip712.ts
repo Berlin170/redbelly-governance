@@ -1,4 +1,5 @@
 import { CHAIN_ID } from "./chains";
+import { normalizeProfile } from "./profile-fields";
 import type { VoteChoice } from "./types";
 
 /**
@@ -74,6 +75,11 @@ export interface ProfileMessage {
  * Every field is signed, empty ones included. Signing only what was filled in
  * would let a cleared bio be replayed as if it were never cleared, so absent
  * is spelled "" and is as much a part of the claim as any text.
+ *
+ * Fields are normalised here, before the wallet sees them, so the string that
+ * gets signed is the string that gets stored. The server re-derives the same
+ * values and refuses anything that disagrees, which is what makes a stored
+ * profile re-verifiable against its own signature.
  */
 export function buildProfileMessage(params: {
   from: `0x${string}`;
@@ -85,11 +91,7 @@ export function buildProfileMessage(params: {
 }): ProfileMessage {
   return {
     from: params.from,
-    displayName: params.displayName?.trim() ?? "",
-    bio: params.bio?.trim() ?? "",
-    avatar: params.avatar?.trim() ?? "",
-    twitter: params.twitter?.trim() ?? "",
-    github: params.github?.trim() ?? "",
+    ...normalizeProfile(params),
     timestamp: BigInt(Math.floor(Date.now() / 1000)),
   };
 }

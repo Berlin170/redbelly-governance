@@ -1,9 +1,37 @@
+import { createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { LIMITS, dayAgo } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 512 * 1024;
+
+/**
+ * Who is calling, as a number rather than a name.
+ *
+ * A rolling count has to recognise a repeat caller, which a keyed digest does,
+ * and nothing beyond that needs to know whose address it was. Keying it means
+ * the stored value cannot be walked back to an IP by anyone who later reads
+ * the table, and salting it with a server-only secret means it cannot be
+ * confirmed by guessing either.
+ */
+function callerId(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const ip = forwarded || req.headers.get("x-real-ip") || "unknown";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  return createHmac("sha256", key).update(ip).digest("hex");
+}
+
+/** Same missing-table shape the follows and profiles endpoints learned. */
+function isMissingTable(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    /schema cache/i.test(error.message ?? "")
+  );
+}
 
 /**
  * Magic bytes, not the Content-Type header.
@@ -50,6 +78,30 @@ function sniff(bytes: Uint8Array): { ext: string; mime: string } | null {
  */
 export async function POST(req: NextRequest) {
   try {
+    const db = supabaseAdmin();
+    const caller = callerId(req);
+
+    // Counted before the body is read: a caller past its ceiling should not
+    // get to hand us half a megabyte first.
+    const { count, error: countErr } = await db
+      .from("avatar_uploads")
+      .select("id", { count: "exact", head: true })
+      .eq("caller", caller)
+      .gte("created_at", dayAgo());
+
+    // A deployment that has not run migration 007 has no ledger to count in.
+    // Uploads keep working there, unthrottled, exactly as they did before —
+    // the alternative is a missing table silently disabling avatars, which is
+    // how the follows endpoint learned this lesson the first time.
+    const throttled = !isMissingTable(countErr);
+
+    if (throttled && (count ?? 0) >= LIMITS.avatarsPerCallerPerDay) {
+      return NextResponse.json(
+        { error: "Too many avatar uploads from here today. Try again tomorrow." },
+        { status: 429 }
+      );
+    }
+
     const form = await req.formData();
     const file = form.get("file");
 
@@ -73,7 +125,6 @@ export async function POST(req: NextRequest) {
     }
 
     const key = `${crypto.randomUUID()}.${kind.ext}`;
-    const db = supabaseAdmin();
     const { error } = await db.storage.from("avatars").upload(key, bytes, {
       contentType: kind.mime,
       cacheControl: "31536000",
@@ -91,6 +142,10 @@ export async function POST(req: NextRequest) {
         { status: missing ? 503 : 500 }
       );
     }
+
+    // Counted only once the bytes are actually stored, so a rejected image
+    // never spends part of someone's allowance.
+    if (throttled) await db.from("avatar_uploads").insert({ caller });
 
     const { data } = db.storage.from("avatars").getPublicUrl(key);
     return NextResponse.json({ url: data.publicUrl });

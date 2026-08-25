@@ -204,7 +204,19 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      // 23505 on proposals_signature_key: this exact payload has been posted
+      // before. Proposals publish their signatures, so a replay is not an
+      // overwrite but a duplicate filed under the original author's name.
+      // The unique index is what refuses it; this only explains the refusal.
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "This proposal has already been posted." },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ proposal: data }, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Could not create the proposal.";
