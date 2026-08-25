@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import { AddressAvatar } from "@/components/address-avatar";
 import { domain, profileTypes, buildProfileMessage } from "@/lib/eip712";
 import { useProfile } from "@/lib/use-profiles";
 import { shortAddress } from "@/lib/utils";
+import { Upload, Loader2, X } from "lucide-react";
 
 const NAME_MAX = 40;
 const BIO_MAX = 200;
@@ -51,6 +52,8 @@ export function ProfileSheet({
   const [twitter, setTwitter] = useState("");
   const [github, setGithub] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Re-seed whenever the sheet opens rather than on every profile change, so
   // a background refetch cannot overwrite half-typed edits.
@@ -63,6 +66,27 @@ export function ProfileSheet({
     setGithub(profile?.github ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  async function pickFile(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/avatar", { method: "POST", body });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Could not upload the image.");
+      // The upload only produces a URL. It becomes this member's avatar when
+      // they sign the profile below, not a moment sooner.
+      setAvatar(json.url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not upload the image.");
+    } finally {
+      setUploading(false);
+      // Let the same file be chosen again after a failure.
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
 
   async function save() {
     if (!address) return;
@@ -167,15 +191,61 @@ export function ProfileSheet({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="avatar">Avatar URL</Label>
-            <Input
-              id="avatar"
-              value={avatar}
-              placeholder="https://…"
-              onChange={(e) => setAvatar(e.target.value)}
+            <Label>Avatar</Label>
+
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="sr-only"
+              onChange={(e) => pickFile(e.target.files?.[0])}
             />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploading}
+                onClick={() => fileInput.current?.click()}
+              >
+                {uploading ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 size-4" />
+                )}
+                {uploading ? "Uploading" : avatar ? "Replace image" : "Upload image"}
+              </Button>
+
+              {avatar && !uploading && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAvatar("")}
+                >
+                  <X className="mr-1 size-4" />
+                  Remove
+                </Button>
+              )}
+            </div>
+
+            <details className="group">
+              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                Or paste an image URL
+              </summary>
+              <Input
+                id="avatar"
+                value={avatar}
+                placeholder="https://…"
+                className="mt-2"
+                onChange={(e) => setAvatar(e.target.value)}
+              />
+            </details>
+
             <p className="text-xs text-muted-foreground">
-              Leave empty to keep the avatar your address already resolves to.
+              PNG, JPEG, GIF or WebP, up to 512 KB. Leave empty to keep the
+              avatar your address already resolves to.
             </p>
           </div>
 
@@ -208,7 +278,7 @@ export function ProfileSheet({
         </div>
 
         <SheetFooter>
-          <Button onClick={save} disabled={busy || !address}>
+          <Button onClick={save} disabled={busy || uploading || !address}>
             {busy ? "Waiting for signature" : "Sign and save"}
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
