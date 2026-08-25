@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { domain, voteTypes, canonicalChoice } from "@/lib/eip712";
 import {
   getVotingPower,
+  isIdentityVerified,
   snapshotDrift,
   MAX_SNAPSHOT_DRIFT_SECONDS,
 } from "@/lib/voting-power";
@@ -45,6 +46,27 @@ export async function POST(req: NextRequest) {
     }
     if (now > new Date(proposal.end_at).getTime()) {
       return NextResponse.json({ error: "Voting has closed." }, { status: 400 });
+    }
+
+    // The identity gate, before any power is measured. A blocked address gets
+    // told why and what to do about it rather than a bare refusal — the fix is
+    // a Receptor credential, which is not something to leave people guessing at.
+    if (proposal.require_verified) {
+      const verified = await isIdentityVerified(
+        getAddress(message.from),
+        proposal.snapshot_block
+      );
+      if (!verified) {
+        return NextResponse.json(
+          {
+            error:
+              "This proposal is open to identity-verified wallets only. This " +
+              "address does not hold a Receptor credential on Redbelly, so it " +
+              "cannot vote here.",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const choice = JSON.parse(message.choice);

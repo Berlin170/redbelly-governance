@@ -99,6 +99,24 @@ async function verifiedIdentityPower(
   return data ? 1 : 0;
 }
 
+/**
+ * May this address vote at all?
+ *
+ * Deliberately separate from voting power. Eligibility asks whether an
+ * address belongs to a verified person; power asks how much its vote weighs.
+ * Conflating them meant a DAO could not have RBNT-weighted voting restricted
+ * to verified members — it had to give up weighting to get the gate.
+ *
+ * Read at the proposal's snapshot block, like everything else, so a wallet
+ * credentialed after voting opened cannot join a vote in progress.
+ */
+export async function isIdentityVerified(
+  voter: string,
+  blockNumber?: number | null
+): Promise<boolean> {
+  return (await verifiedIdentityPower(voter, blockNumber)) === 1;
+}
+
 export async function getVotingPower(params: {
   voter: string;
   strategy: VotingStrategy;

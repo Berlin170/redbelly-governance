@@ -193,6 +193,7 @@ export async function POST(req: NextRequest) {
         choices,
         voting_system: message.votingSystem,
         strategy: message.strategy,
+        require_verified: !!message.requireVerified,
         token_address: message.tokenAddress || null,
         snapshot_block: snapshotBlock,
         quorum: Number(message.quorum ?? 0),

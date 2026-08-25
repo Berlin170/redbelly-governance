@@ -32,6 +32,7 @@ export const proposalTypes = {
     { name: "choices", type: "string" },
     { name: "votingSystem", type: "string" },
     { name: "strategy", type: "string" },
+    { name: "requireVerified", type: "bool" },
     { name: "start", type: "uint64" },
     { name: "end", type: "uint64" },
     { name: "timestamp", type: "uint64" },
@@ -130,6 +131,7 @@ export interface ProposalMessage {
   choices: string;
   votingSystem: string;
   strategy: string;
+  requireVerified: boolean;
   start: bigint;
   end: bigint;
   timestamp: bigint;

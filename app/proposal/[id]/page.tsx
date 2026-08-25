@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, MessageSquare } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageSquare, ShieldCheck } from "lucide-react";
 import { VotePanel } from "@/components/vote-panel";
 import { ResultsPanel } from "@/components/results-panel";
 import { VotersTable } from "@/components/voters-table";
@@ -146,6 +146,20 @@ export default function ProposalPage({
               )}
               <span className="text-border">·</span>
               <span>{system?.label}</span>
+              {proposal.require_verified && (
+                <>
+                  <span className="text-border">·</span>
+                  {/* A term of the vote, so it belongs where the terms are read,
+                      not only in the error someone gets after signing. */}
+                  <span
+                    className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs"
+                    title="Only wallets holding a Receptor credential can vote on this proposal."
+                  >
+                    <ShieldCheck className="size-3" />
+                    Verified wallets only
+                  </span>
+                </>
+              )}
             </p>
 
             {proposal.discussion && (

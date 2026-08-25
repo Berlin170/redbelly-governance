@@ -67,6 +67,7 @@ export interface Proposal {
   choices: string[];
   voting_system: VotingSystem;
   strategy: VotingStrategy;
+  require_verified: boolean;
   token_address: string | null;
   snapshot_block: number | null;
   quorum: number;

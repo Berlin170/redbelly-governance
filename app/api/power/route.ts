@@ -3,6 +3,7 @@ import { getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   getVotingPower,
+  isIdentityVerified,
   snapshotDrift,
   MAX_SNAPSHOT_DRIFT_SECONDS,
 } from "@/lib/voting-power";
@@ -47,6 +48,25 @@ export async function GET(req: NextRequest) {
           power: 0,
           unavailable:
             "This proposal's snapshot block is not from the current network.",
+        });
+      }
+    }
+
+    // The identity gate is reported here for the same reason power is: the
+    // vote endpoint will refuse this address, and finding that out after a
+    // wallet popup is the worst way to learn it.
+    if (proposal.require_verified) {
+      const verified = await isIdentityVerified(
+        getAddress(voter),
+        proposal.snapshot_block
+      );
+      if (!verified) {
+        return NextResponse.json({
+          power: 0,
+          blocked: true,
+          unavailable:
+            "This proposal is open to identity-verified wallets only. This " +
+            "address does not hold a Receptor credential on Redbelly.",
         });
       }
     }

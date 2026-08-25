@@ -71,6 +71,7 @@ export default function CreatePage() {
   const [strategy, setStrategy] = useState<VotingStrategy>("native-balance");
   const [tokenAddress, setTokenAddress] = useState("");
   const [quorum, setQuorum] = useState("0");
+  const [requireVerified, setRequireVerified] = useState(false);
   const [days, setDays] = useState("5");
   const [submitting, setSubmitting] = useState(false);
 
@@ -109,6 +110,9 @@ export default function CreatePage() {
         choices: JSON.stringify(cleaned),
         votingSystem: system,
         strategy,
+        // Signed, not merely sent. A gate the author did not sign would be a
+        // term of the proposal that nobody can prove they agreed to.
+        requireVerified: system === "one-person-one-vote" ? true : requireVerified,
         start: BigInt(start),
         end: BigInt(end),
         timestamp: BigInt(Math.floor(Date.now() / 1000)),
@@ -293,6 +297,35 @@ export default function CreatePage() {
               />
             </div>
           )}
+
+          {/* Eligibility, kept apart from weighting. One person one vote implies
+              the gate, so the control is forced on and explains why rather than
+              silently disagreeing with the system above it. */}
+          <label
+            htmlFor="require-verified"
+            className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3.5"
+          >
+            <input
+              id="require-verified"
+              type="checkbox"
+              className="mt-0.5 size-4 shrink-0 accent-primary"
+              checked={system === "one-person-one-vote" ? true : requireVerified}
+              disabled={system === "one-person-one-vote" || !identityAvailable}
+              onChange={(e) => setRequireVerified(e.target.checked)}
+            />
+            <span className="space-y-1">
+              <span className="block text-sm font-medium">
+                Verified wallets only
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {system === "one-person-one-vote"
+                  ? "Always on for one person, one vote."
+                  : !identityAvailable
+                    ? "No identity contract is known for this chain."
+                    : "Only wallets holding a Receptor credential can vote. Voting power is still measured by the strategy above."}
+              </span>
+            </span>
+          </label>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
