@@ -65,6 +65,12 @@ Redbelly Testnet if you want a rehearsal environment.
 `SUPABASE_SERVICE_ROLE_KEY` is the secret key, not the publishable one. It is
 server-only and must never appear in a client component.
 
+`NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is what makes the portal usable on a
+phone. Chrome and Safari on mobile have no wallet extension to connect to, so
+without it the only way in from a phone is the browser built into a wallet
+app. A project ID is free from https://cloud.reown.com and adds a
+WalletConnect option that reaches the wallet app from any mobile browser.
+
 **4. Run**
 
 ```bash
