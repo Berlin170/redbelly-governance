@@ -25,10 +25,13 @@ function isMissingTable(error: { code?: string; message?: string } | null) {
 /**
  * Follower counts, and following as a signed action.
  *
- * The count shown is the imported Snapshot following plus everyone who has
- * followed here. Dropping the imported number the day this shipped would have
- * told the DAO it had lost its community, when all that changed was where the
- * list is kept.
+ * The count is count(*) over the follows table and nothing else. The imported
+ * Snapshot following used to be added on top as spaces.followers_count, which
+ * kept the DAO's community visible on day one but froze it: the scalar was
+ * read once and never moved again, so the portal drifted from Snapshot and
+ * from itself. Those followers are rows in this table now — see
+ * supabase/migrations/002_follow_sources.sql — and the column survives only as
+ * the fallback for a deployment that has yet to run the migrations.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -47,6 +50,7 @@ export async function GET(req: NextRequest) {
     .eq("id", space)
     .maybeSingle();
 
+  // Only reached when the follows table is missing entirely.
   const imported = spaceRow?.followers_count ?? 0;
 
   // limit(0) rather than head:true. A head request throws away the response
@@ -77,7 +81,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    count: imported + (count ?? 0),
+    count: count ?? 0,
     following,
     available: true,
   });
@@ -106,8 +110,10 @@ export async function POST(req: NextRequest) {
     const { error } = message.following
       ? await db
           .from("follows")
+          // source is set, not left to the default: an imported follower who
+          // signs here has stopped being hearsay and should say so.
           .upsert(
-            { space_id: message.space, follower, signature },
+            { space_id: message.space, follower, signature, source: "portal" },
             { onConflict: "space_id,follower" }
           )
       : await db

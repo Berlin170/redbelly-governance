@@ -292,11 +292,85 @@ async function importVotes(proposals, bySourceId) {
   console.log(`votes     ${total} imported`);
 }
 
+// -------------------------------------------------------------- followers
+/**
+ * The follower list, as people rather than as a count.
+ *
+ * followersCount is a scalar frozen the moment it is read; a portal that adds
+ * its own follows on top of it drifts from the first day and can never catch
+ * up. Snapshot exposes every follower address, so they are imported as
+ * ordinary rows and the count becomes count(*).
+ *
+ * Imported rows carry source 'snapshot' and no signature — nobody signed
+ * anything here, and the imported proposals make the same admission. Follows
+ * made on this portal are never touched.
+ */
+async function importFollowers() {
+  const all = [];
+  const PAGE = 1000;
+
+  for (let skip = 0; ; skip += PAGE) {
+    const { follows } = await gql(
+      `query ($space: String!, $first: Int!, $skip: Int!) {
+         follows(first: $first, skip: $skip, where: { space: $space }) {
+           follower
+           created
+         }
+       }`,
+      { space: SNAPSHOT_SPACE, first: PAGE, skip }
+    );
+
+    all.push(...follows);
+    if (follows.length < PAGE) break;
+    await sleep(250);
+  }
+
+  // Snapshot has returned the same address twice before; the primary key would
+  // reject the batch rather than the duplicate, so collapse them here.
+  const seen = new Map();
+  for (const f of all) {
+    const key = f.follower.toLowerCase();
+    if (!seen.has(key)) seen.set(key, f);
+  }
+
+  // A signed follow made here outranks the import. Upserting over it would
+  // blank its signature and relabel it 'snapshot', quietly turning proof into
+  // hearsay, so anyone who already follows on this portal is left alone.
+  const signed = await db(
+    `follows?select=follower&space_id=eq.${encodeURIComponent(SPACE_ID)}&source=eq.portal`,
+    { method: "GET" }
+  );
+  const owned = new Set((signed ?? []).map((r) => r.follower.toLowerCase()));
+  for (const key of owned) seen.delete(key);
+
+  const rows = [...seen.values()].map((f) => ({
+    space_id: SPACE_ID,
+    follower: f.follower,
+    signature: null,
+    source: "snapshot",
+    created_at: iso(f.created),
+  }));
+
+  if (rows.length) {
+    await db("follows?on_conflict=space_id,follower", {
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: rows,
+    });
+  }
+
+  console.log(
+    `followers ${rows.length} imported` +
+      (owned.size ? `, ${owned.size} already signed here` : "")
+  );
+  return rows.length;
+}
+
 // ------------------------------------------------------------------- run
 async function main() {
   console.log(`Importing ${SNAPSHOT_SPACE} -> space "${SPACE_ID}"\n`);
 
   await importSpace();
+  await importFollowers();
 
   const proposals = await fetchAllProposals();
   const bySourceId = await importProposals(proposals);

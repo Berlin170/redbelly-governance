@@ -100,9 +100,9 @@ export function StatStrip() {
     },
     {
       label: "Followers",
-      // The imported Snapshot total until the shared query lands, so the tile
-      // never flashes a zero — then the same number the header shows, which
-      // counts everyone who has followed here as well.
+      // The last imported total stands in until the shared query lands, so the
+      // tile never flashes a zero. It is only a placeholder: followers_count is
+      // frozen at import time, and the query replaces it with the live count.
       value: followers?.count ?? space?.followers_count ?? 0,
       hint: "Members following this space, imported followers included.",
     },
