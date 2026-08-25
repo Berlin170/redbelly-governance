@@ -13,6 +13,7 @@ import { formatPower, receiptUrl, shortAddress } from "@/lib/utils";
 import { explorerAddress } from "@/lib/chains";
 import { FileCheck2 } from "lucide-react";
 import { AddressAvatar } from "@/components/address-avatar";
+import { useProfiles, displayName } from "@/lib/use-profiles";
 import type { Vote, VotingSystem } from "@/lib/types";
 
 export function VotersTable({
@@ -24,6 +25,9 @@ export function VotersTable({
   system: VotingSystem;
   choices: string[];
 }) {
+  // One request for the whole table rather than one per row.
+  const { data: profiles } = useProfiles(votes.map((v) => v.voter));
+
   if (votes.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
@@ -52,8 +56,24 @@ export function VotersTable({
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 text-sm hover:text-primary"
               >
-                <AddressAvatar address={vote.voter} size={22} />
-                <span className="tabular">{shortAddress(vote.voter)}</span>
+                <AddressAvatar
+                  address={vote.voter}
+                  src={profiles?.[vote.voter.toLowerCase()]?.avatar_url}
+                  size={22}
+                />
+                <span
+                  className={
+                    profiles?.[vote.voter.toLowerCase()]?.display_name
+                      ? "max-w-[12rem] truncate"
+                      : "tabular"
+                  }
+                  title={vote.voter}
+                >
+                  {displayName(
+                    profiles?.[vote.voter.toLowerCase()],
+                    shortAddress(vote.voter)
+                  )}
+                </span>
               </a>
               {vote.reason && (
                 <p className="mt-0.5 max-w-xs truncate text-xs text-muted-foreground">

@@ -13,6 +13,7 @@ import {
   timeAgo,
   timeLeft,
 } from "@/lib/utils";
+import { displayName, type Profile } from "@/lib/use-profiles";
 import type { ProposalListItem } from "@/lib/types";
 
 const CHART = [
@@ -114,7 +115,18 @@ function ResultSummary({ item }: { item: ProposalListItem }) {
   );
 }
 
-export function ProposalRow({ item }: { item: ProposalListItem }) {
+/**
+ * The author's profile is passed in rather than fetched here. A row that
+ * resolved its own author would put one request behind every line of a
+ * thirty-row list; the pages that render lists resolve them all in one.
+ */
+export function ProposalRow({
+  item,
+  profile,
+}: {
+  item: ProposalListItem;
+  profile?: Profile;
+}) {
   const state = proposalState(item.start_at, item.end_at);
   const outcome = state === "closed" ? outcomeOf(item, item.results) : undefined;
 
@@ -140,8 +152,17 @@ export function ProposalRow({ item }: { item: ProposalListItem }) {
             <span className="tabular">{shortProposalId(item)}</span>
 
             <span className="inline-flex items-center gap-1.5">
-              <AddressAvatar address={item.author} size={16} />
-              <span className="tabular">{shortAddress(item.author)}</span>
+              <AddressAvatar
+                address={item.author}
+                src={profile?.avatar_url}
+                size={16}
+              />
+              <span
+                className={profile?.display_name ? "max-w-[12rem] truncate" : "tabular"}
+                title={item.author}
+              >
+                {displayName(profile, shortAddress(item.author))}
+              </span>
             </span>
 
             <span className="text-border">·</span>

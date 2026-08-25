@@ -47,6 +47,52 @@ export const followTypes = {
   ],
 } as const;
 
+export const profileTypes = {
+  Profile: [
+    { name: "from", type: "address" },
+    { name: "displayName", type: "string" },
+    { name: "bio", type: "string" },
+    { name: "avatar", type: "string" },
+    { name: "twitter", type: "string" },
+    { name: "github", type: "string" },
+    { name: "timestamp", type: "uint64" },
+  ],
+} as const;
+
+export interface ProfileMessage {
+  from: `0x${string}`;
+  displayName: string;
+  bio: string;
+  avatar: string;
+  twitter: string;
+  github: string;
+  timestamp: bigint;
+}
+
+/**
+ * Every field is signed, empty ones included. Signing only what was filled in
+ * would let a cleared bio be replayed as if it were never cleared, so absent
+ * is spelled "" and is as much a part of the claim as any text.
+ */
+export function buildProfileMessage(params: {
+  from: `0x${string}`;
+  displayName?: string;
+  bio?: string;
+  avatar?: string;
+  twitter?: string;
+  github?: string;
+}): ProfileMessage {
+  return {
+    from: params.from,
+    displayName: params.displayName?.trim() ?? "",
+    bio: params.bio?.trim() ?? "",
+    avatar: params.avatar?.trim() ?? "",
+    twitter: params.twitter?.trim() ?? "",
+    github: params.github?.trim() ?? "",
+    timestamp: BigInt(Math.floor(Date.now() / 1000)),
+  };
+}
+
 export interface FollowMessage {
   from: `0x${string}`;
   space: string;

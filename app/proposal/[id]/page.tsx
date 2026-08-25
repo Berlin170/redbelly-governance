@@ -8,6 +8,7 @@ import { ResultsPanel } from "@/components/results-panel";
 import { VotersTable } from "@/components/voters-table";
 import { ProposalBody } from "@/components/proposal-body";
 import { StatusBadge } from "@/components/status-badge";
+import { AddressAvatar } from "@/components/address-avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +20,7 @@ import {
   timeLeft,
 } from "@/lib/utils";
 import { explorerAddress } from "@/lib/chains";
+import { useProfile, displayName } from "@/lib/use-profiles";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import type { Proposal, TallyResult, Vote } from "@/lib/types";
 
@@ -48,6 +50,10 @@ export default function ProposalPage({
   }, [id]);
 
   useEffect(load, [load]);
+
+  // Declared above the early returns: the page bails out to an error or a
+  // skeleton below, and a hook that runs only sometimes is not a hook.
+  const { data: authorProfile } = useProfile(data?.proposal.author);
 
   if (error) {
     return (
@@ -119,10 +125,25 @@ export default function ProposalPage({
                 href={explorerAddress(proposal.author)}
                 target="_blank"
                 rel="noreferrer"
-                className="tabular transition-colors hover:text-foreground"
+                className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+                title={proposal.author}
               >
-                {shortAddress(proposal.author)}
+                <AddressAvatar
+                  address={proposal.author}
+                  src={authorProfile?.avatar_url}
+                  size={16}
+                />
+                <span className={authorProfile?.display_name ? undefined : "tabular"}>
+                  {displayName(authorProfile, shortAddress(proposal.author))}
+                </span>
               </a>
+              {/* A name is a label on an address, so the address stays on the
+                  line beside it rather than being replaced by it. */}
+              {authorProfile?.display_name && (
+                <span className="tabular text-xs">
+                  {shortAddress(proposal.author)}
+                </span>
+              )}
               <span className="text-border">·</span>
               <span>{system?.label}</span>
             </p>

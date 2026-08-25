@@ -161,3 +161,14 @@ export interface ProposalListItem extends Proposal {
   vote_count: number;
   results: TallyResult;
 }
+
+export interface Profile {
+  address: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  twitter: string | null;
+  github: string | null;
+  signature: string;
+  updated_at: string;
+}

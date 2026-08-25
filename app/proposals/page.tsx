@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { ProposalRow, EmptyRows } from "@/components/proposal-row";
+import { useProfiles } from "@/lib/use-profiles";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -88,6 +89,8 @@ function ProposalsList() {
   const params = useSearchParams();
   const query = (params.get("q") ?? "").trim().toLowerCase();
   const { data: proposals, error, isLoading } = useProposals();
+  // Every author on the page resolved in one request, then handed to each row.
+  const { data: profiles } = useProfiles((proposals ?? []).map((p) => p.author));
 
   const [lane, setLane] = useState<Lane>("all");
   const [sort, setSort] = useState<SortKey>("newest");
@@ -235,7 +238,11 @@ function ProposalsList() {
             }
           />
         ) : (
-          visible.map((p) => <ProposalRow key={p.id} item={p} />)
+          visible.map((p) => <ProposalRow
+                    key={p.id}
+                    item={p}
+                    profile={profiles?.[p.author.toLowerCase()]}
+                  />)
         )}
       </div>
     </div>

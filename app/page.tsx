@@ -5,6 +5,7 @@ import { ArrowRight, Plus } from "lucide-react";
 import { SpaceHeader } from "@/components/space-header";
 import { StatStrip } from "@/components/stat-strip";
 import { ProposalRow, EmptyRows } from "@/components/proposal-row";
+import { useProfiles } from "@/lib/use-profiles";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProposals } from "@/lib/use-proposals";
@@ -37,6 +38,8 @@ function SectionHead({
 
 export default function OverviewPage() {
   const { data: proposals, error, isLoading } = useProposals();
+  // Every author on the page resolved in one request, then handed to each row.
+  const { data: profiles } = useProfiles((proposals ?? []).map((p) => p.author));
 
   const active = (proposals ?? []).filter(
     (p) => proposalState(p.start_at, p.end_at) === "active"
@@ -85,7 +88,11 @@ export default function OverviewPage() {
 
               <div className="overflow-hidden rounded-xl border border-border bg-card">
                 {active.map((p) => (
-                  <ProposalRow key={p.id} item={p} />
+                  <ProposalRow
+                    key={p.id}
+                    item={p}
+                    profile={profiles?.[p.author.toLowerCase()]}
+                  />
                 ))}
               </div>
             </section>
@@ -118,7 +125,11 @@ export default function OverviewPage() {
               ) : recent.length === 0 ? (
                 <EmptyRows message="No past proposals yet." />
               ) : (
-                recent.map((p) => <ProposalRow key={p.id} item={p} />)
+                recent.map((p) => <ProposalRow
+                    key={p.id}
+                    item={p}
+                    profile={profiles?.[p.author.toLowerCase()]}
+                  />)
               )}
             </div>
           </section>

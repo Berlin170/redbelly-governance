@@ -17,21 +17,36 @@ function gradientFor(address: string) {
 }
 
 /**
- * Voter avatar. Real ENS/Snapshot avatars come from the same CDN Snapshot
- * itself uses, so an address that already has an identity elsewhere keeps it
- * here. Anything without one falls back to a generated gradient rather than a
- * grey blank, so a list of voters stays visually scannable.
+ * Voter avatar. A profile avatar set on this portal wins; otherwise the same
+ * CDN Snapshot itself uses supplies any ENS/Snapshot avatar the address
+ * already has, so an identity earned elsewhere carries over. Anything without
+ * one falls back to a generated gradient rather than a grey blank, so a list
+ * of voters stays visually scannable.
  */
 export function AddressAvatar({
   address,
   size = 24,
   className,
+  src,
 }: {
   address: string;
   size?: number;
   className?: string;
+  /** A profile avatar, which outranks whatever the address resolves to. */
+  src?: string | null;
 }) {
   const [failed, setFailed] = useState(false);
+  const chosen =
+    src?.trim() ||
+    `https://cdn.stamp.fyi/avatar/eth:${address.toLowerCase()}?s=${size * 2}`;
+
+  // A new URL deserves a fresh attempt; without this, one broken avatar keeps
+  // the fallback pinned even after the user corrects it.
+  const [tried, setTried] = useState(chosen);
+  if (tried !== chosen) {
+    setTried(chosen);
+    setFailed(false);
+  }
 
   return (
     <Avatar
@@ -40,7 +55,7 @@ export function AddressAvatar({
     >
       {!failed && (
         <AvatarImage
-          src={`https://cdn.stamp.fyi/avatar/eth:${address.toLowerCase()}?s=${size * 2}`}
+          src={chosen}
           alt=""
           onError={() => setFailed(true)}
           className="rounded-md object-cover"
