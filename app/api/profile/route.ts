@@ -1,21 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTypedData, getAddress, isAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isMissingTable, isMissingColumn } from "@/lib/pg-errors";
 import { domain, profileTypes } from "@/lib/eip712";
 import { normalizeProfile, unnormalizedFields } from "@/lib/profile-fields";
 import { MAX_CLOCK_SKEW_SECONDS } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
-
-/** Same missing-table shape the follows endpoint learned the hard way. */
-function isMissingTable(error: { code?: string; message?: string } | null) {
-  if (!error) return false;
-  return (
-    error.code === "42P01" ||
-    error.code === "PGRST205" ||
-    /schema cache/i.test(error.message ?? "")
-  );
-}
 
 /**
  * GET /api/profile?addresses=0x..,0x..  — batch lookup for lists
@@ -111,13 +102,16 @@ export async function POST(req: NextRequest) {
       .eq("address", address)
       .maybeSingle();
 
+    const guarded = !isMissingColumn(priorErr);
+
     if (isMissingTable(priorErr)) {
       return NextResponse.json(
         { error: "Profiles are not enabled yet on this deployment." },
         { status: 503 }
       );
     }
-    if (prior?.signed_at != null && signedAt <= Number(prior.signed_at)) {
+
+    if (guarded && prior?.signed_at != null && signedAt <= Number(prior.signed_at)) {
       return NextResponse.json(
         { error: "This profile has already been saved. Sign again to change it." },
         { status: 409 }
@@ -135,7 +129,7 @@ export async function POST(req: NextRequest) {
       twitter: fields.twitter || null,
       github: fields.github || null,
       signature,
-      signed_at: signedAt,
+      ...(guarded ? { signed_at: signedAt } : {}),
       updated_at: new Date().toISOString(),
     };
 

@@ -1,26 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTypedData, getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isMissingTable } from "@/lib/pg-errors";
 import { domain, followTypes } from "@/lib/eip712";
 
 export const dynamic = "force-dynamic";
-
-/**
- * "The follows table is not there yet."
- *
- * Postgres says 42P01, but PostgREST answers from its own schema cache and
- * reports PGRST205 with a different message, which is what actually comes
- * back through supabase-js. Both are checked, and the message as a last
- * resort, so the fallback triggers on the error that really arrives.
- */
-function isMissingTable(error: { code?: string; message?: string } | null) {
-  if (!error) return false;
-  return (
-    error.code === "42P01" ||
-    error.code === "PGRST205" ||
-    /schema cache/i.test(error.message ?? "")
-  );
-}
 
 /**
  * Follower counts, and following as a signed action.

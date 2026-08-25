@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTypedData, getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isMissingColumn } from "@/lib/pg-errors";
 import { domain, voteTypes, canonicalChoice } from "@/lib/eip712";
 import {
   getVotingPower,
@@ -89,16 +90,29 @@ export async function POST(req: NextRequest) {
     // every signature exactly once. Checked before any RPC work, because a
     // replay should cost us a single indexed read and nothing more.
     const voter = getAddress(message.from);
-    const { data: prior } = await db
+    const { data: prior, error: priorErr } = await db
       .from("votes")
       .select("signed_at")
       .eq("proposal_id", proposal.id)
       .eq("voter", voter)
       .maybeSingle();
 
+    // A deployment can be ahead of its database for as long as it takes
+    // someone to paste migration 006 into the SQL editor. Refusing to record
+    // votes for that window would be a worse failure than the replay the
+    // column exists to stop, so voting carries on exactly as it did before and
+    // the guard switches itself on the moment the column appears.
+    const guarded = !isMissingColumn(priorErr);
+    if (!guarded) {
+      console.warn(
+        "[votes] signed_at is missing — replay protection is OFF until " +
+          "supabase/migrations/006_replay_protection.sql has been run."
+      );
+    }
+
     // Null means a vote cast before migration 006, or imported history. There
     // is no floor to enforce yet; this vote sets one for everything after it.
-    if (prior?.signed_at != null && signedAt <= Number(prior.signed_at)) {
+    if (guarded && prior?.signed_at != null && signedAt <= Number(prior.signed_at)) {
       return NextResponse.json(
         {
           error:
@@ -178,8 +192,10 @@ export async function POST(req: NextRequest) {
           voting_power: votingPower,
           // Stored so the replay floor survives, and so the published
           // signature can finally be re-verified against the published row:
-          // rebuilding the signed payload needs this timestamp.
-          signed_at: signedAt,
+          // rebuilding the signed payload needs this timestamp. Omitted
+          // entirely where the column has yet to exist, so the write still
+          // lands rather than failing on an unknown field.
+          ...(guarded ? { signed_at: signedAt } : {}),
           reason: message.reason || null,
           signature,
         },

@@ -1,6 +1,7 @@
 import { createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isMissingTable } from "@/lib/pg-errors";
 import { LIMITS, dayAgo } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
@@ -21,16 +22,6 @@ function callerId(req: NextRequest): string {
   const ip = forwarded || req.headers.get("x-real-ip") || "unknown";
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   return createHmac("sha256", key).update(ip).digest("hex");
-}
-
-/** Same missing-table shape the follows and profiles endpoints learned. */
-function isMissingTable(error: { code?: string; message?: string } | null) {
-  if (!error) return false;
-  return (
-    error.code === "42P01" ||
-    error.code === "PGRST205" ||
-    /schema cache/i.test(error.message ?? "")
-  );
 }
 
 /**
