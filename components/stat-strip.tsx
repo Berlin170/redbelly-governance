@@ -1,6 +1,7 @@
 "use client";
 
 import { useSpace } from "@/components/space-provider";
+import { useFollowers } from "@/lib/use-followers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,7 @@ function StatTile({ tile }: { tile: Tile }) {
 
 export function StatStrip() {
   const { space, stats, isLoading } = useSpace();
+  const { data: followers } = useFollowers(space?.id);
 
   if (isLoading || !stats) {
     return (
@@ -98,8 +100,11 @@ export function StatStrip() {
     },
     {
       label: "Followers",
-      value: space?.followers_count ?? 0,
-      hint: "Members following this space.",
+      // The imported Snapshot total until the shared query lands, so the tile
+      // never flashes a zero — then the same number the header shows, which
+      // counts everyone who has followed here as well.
+      value: followers?.count ?? space?.followers_count ?? 0,
+      hint: "Members following this space, imported followers included.",
     },
   ];
 

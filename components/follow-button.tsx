@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { domain, followTypes, buildFollowMessage } from "@/lib/eip712";
+import { useFollowers, followersKey } from "@/lib/use-followers";
 import { Check, Plus } from "lucide-react";
 
 /**
@@ -18,28 +20,13 @@ import { Check, Plus } from "lucide-react";
 export function FollowButton({ spaceId }: { spaceId: string }) {
   const { address, isConnected } = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
-  const [count, setCount] = useState<number | null>(null);
-  const [following, setFollowing] = useState(false);
-  const [available, setAvailable] = useState(true);
+  const queryClient = useQueryClient();
+  const { data } = useFollowers(spaceId);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    const url = `/api/follow?space=${encodeURIComponent(spaceId)}${
-      address ? `&address=${address}` : ""
-    }`;
-    try {
-      const json = await (await fetch(url)).json();
-      setCount(json.count ?? null);
-      setFollowing(!!json.following);
-      setAvailable(json.available !== false);
-    } catch {
-      /* the header should not break because a count failed to load */
-    }
-  }, [spaceId, address]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const count = data?.count ?? null;
+  const following = data?.following ?? false;
+  const available = data?.available !== false;
 
   async function toggle() {
     if (!address) return;
@@ -70,8 +57,11 @@ export function FollowButton({ spaceId }: { spaceId: string }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Could not update following.");
 
-      setFollowing(json.following);
-      await load();
+      // Refetching the shared query moves the header and the stat tile
+      // together, rather than only the button that was clicked.
+      await queryClient.invalidateQueries({
+        queryKey: followersKey(spaceId, address),
+      });
       toast.success(json.following ? "Following this space." : "Unfollowed.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not update following.";
