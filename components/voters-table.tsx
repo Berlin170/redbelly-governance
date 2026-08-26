@@ -88,11 +88,13 @@ export function VotersTable({
               {formatPower(vote.voting_power)}
             </TableCell>
             <TableCell className="w-10 text-right">
-              {/* Imported ballots link to the signed original; ballots cast
-                  here are verifiable from their own stored signature. */}
-              {receiptUrl(vote.source_receipt) && (
+              {/* Every ballot links to its own signed record on IPFS —
+                  imported ones to Snapshot's pin, ones cast here to ours.
+                  The gateway differs, the point does not: the signature can
+                  be re-checked without asking this server for anything. */}
+              {receiptUrl(vote.source_receipt, vote.source) && (
                 <a
-                  href={receiptUrl(vote.source_receipt)!}
+                  href={receiptUrl(vote.source_receipt, vote.source)!}
                   target="_blank"
                   rel="noreferrer"
                   title="Signed record on IPFS"

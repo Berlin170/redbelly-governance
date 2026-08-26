@@ -1,6 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { verifyTypedData, getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
+import { isMissingColumn } from "@/lib/pg-errors";
+import { pinAndRecord } from "@/lib/ipfs";
+import { proposalReceipt } from "@/lib/receipts";
 import { domain, proposalTypes } from "@/lib/eip712";
 import { currentBlock, getVotingPower } from "@/lib/voting-power";
 import { LIMITS, dayAgo, PROPOSAL_THRESHOLD } from "@/lib/limits";
@@ -183,26 +186,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { data, error } = await supabaseAdmin()
-      .from("proposals")
-      .insert({
-        space_id: message.space,
-        author: getAddress(message.from),
-        title: message.title,
-        body: message.body,
-        choices,
-        voting_system: message.votingSystem,
-        strategy: message.strategy,
-        require_verified: !!message.requireVerified,
-        token_address: message.tokenAddress || null,
-        snapshot_block: snapshotBlock,
-        quorum: Number(message.quorum ?? 0),
-        start_at: new Date(start * 1000).toISOString(),
-        end_at: new Date(end * 1000).toISOString(),
-        signature,
-      })
-      .select()
-      .single();
+    const row: Record<string, unknown> = {
+      space_id: message.space,
+      author: getAddress(message.from),
+      title: message.title,
+      body: message.body,
+      choices,
+      voting_system: message.votingSystem,
+      strategy: message.strategy,
+      require_verified: !!message.requireVerified,
+      token_address: message.tokenAddress || null,
+      snapshot_block: snapshotBlock,
+      quorum: Number(message.quorum ?? 0),
+      start_at: new Date(start * 1000).toISOString(),
+      end_at: new Date(end * 1000).toISOString(),
+      signature,
+      // The signed timestamp, kept for the same reason votes keep theirs:
+      // re-verifying a published signature means rebuilding the payload it
+      // covers, and `timestamp` is part of that payload. Without it the
+      // signature on a proposal is a string nobody — including us — can check.
+      signed_at: Number(message.timestamp),
+    };
+
+    const db = supabaseAdmin();
+    let { data, error } = await db.from("proposals").insert(row).select().single();
+
+    // signed_at arrives with migration 008, and this deployment may be ahead of
+    // the SQL editor. Dropping it costs the receipt, not the proposal.
+    if (error && isMissingColumn(error)) {
+      console.warn(
+        "[proposals] signed_at is missing — IPFS receipts are OFF until " +
+          "supabase/migrations/008_ipfs_receipts.sql has been run."
+      );
+      delete row.signed_at;
+      ({ data, error } = await db.from("proposals").insert(row).select().single());
+    }
 
     if (error) {
       // 23505 on proposals_signature_key: this exact payload has been posted
@@ -217,6 +235,42 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // After the response, for the same reason votes are: the proposal is
+    // already open, and nothing about publishing a copy of it should be able
+    // to stop it opening.
+    const created = data;
+    after(async () => {
+      await pinAndRecord({
+        table: "proposals",
+        id: created.id,
+        name: `proposal-${created.id}`,
+        receipt: proposalReceipt(
+          {
+            from: message.from,
+            space: message.space,
+            title: message.title,
+            body: message.body,
+            choices: message.choices,
+            votingSystem: message.votingSystem,
+            strategy: message.strategy,
+            requireVerified: !!message.requireVerified,
+            start,
+            end,
+            timestamp: Number(message.timestamp),
+          },
+          signature,
+          {
+            proposal_id: created.id,
+            snapshot_block: snapshotBlock,
+            quorum: Number(message.quorum ?? 0),
+            created_at: created.created_at ?? null,
+          }
+        ),
+        db,
+      });
+    });
+
     return NextResponse.json({ proposal: data }, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Could not create the proposal.";

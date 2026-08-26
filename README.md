@@ -59,6 +59,8 @@ portal degrades quietly without them rather than failing loudly, so a missing
 migration shows up as a feature that seems switched off. `006_replay_protection`
 is the one to run first on an existing deployment, because until it does every
 published vote signature can be posted back to undo a changed vote.
+`008_ipfs_receipts` is what lets a proposal's signature be re-verified at all;
+without it proposals are recorded but never pinned.
 
 **3. Environment**
 
@@ -88,6 +90,57 @@ npm run dev
 Open http://localhost:3000. Add Redbelly Mainnet to MetaMask (chain ID 151,
 RPC `https://governors.mainnet.redbelly.network`) and connect. On testnet the
 chain ID is 153 and the RPC is `https://governors.testnet.redbelly.network`.
+
+## IPFS receipts
+
+Every proposal and ballot signed on this portal is pinned to IPFS, so the
+signature can be re-checked by anyone without asking this server for the
+payload. Imported Snapshot history already worked this way — it arrived with
+Snapshot's own receipts — which meant the DAO's borrowed past was more
+auditable than its own present. Receipts close that, and demote Supabase from
+the only copy of the record to an index that can be rebuilt from one.
+
+What gets pinned is a self-describing envelope: the EIP-712 domain, the type
+definitions and the exact message the wallet signed, plus the signature.
+Verifying one needs nothing out of this repository. Anything the server worked
+out for itself — the voting power it measured, the row id it filed — sits under
+a separate `meta` key, unsigned, because a receipt that appeared to vouch for
+our arithmetic would be lending someone else's signature to it.
+
+Set `PINATA_JWT` and receipts switch on. Leave it blank and the portal behaves
+exactly as it did before: votes are recorded normally, they just carry no
+independent copy. The free tier is not a constraint here — the entire history
+to date, 31 proposals and 547 ballots, is about 300 KB.
+
+Pinning never blocks a vote. The row is written first and the receipt is pinned
+after the response goes out, so a pinning outage cannot stop the DAO voting. It
+does mean the pin is the part that can quietly not happen, which is what
+`GET /api/ipfs/pin` is for: it finds everything signed and not yet pinned, and
+pins it. It is idempotent, it is also the backfill for existing history, and
+`vercel.json` runs it nightly. Guard it with `CRON_SECRET`; unset, it refuses
+everyone. `GET /api/ipfs` reports coverage publicly, so a week of silently
+failed pins is visible to the DAO rather than only in the function logs.
+
+Rows written before the signed timestamp was kept cannot be pinned at all —
+rebuilding an EIP-712 hash needs every signed field, and those rows do not have
+one. They are counted as `unrebuildable` rather than retried forever.
+
+The archive is only worth having if it has been restored, so:
+
+```bash
+npm run rebuild:ipfs                 # verify every pin, write JSON
+npm run rebuild:ipfs -- --restore    # put missing rows back
+```
+
+That script starts from the pinning provider's own index rather than from our
+`source_receipt` column, checks each signature against the payload it covers,
+and reassembles the proposals and votes tables from what verifies. `--restore`
+only inserts rows that are missing; it never overwrites a live one.
+
+IPFS does not replace Supabase and is not meant to. It is immutable and
+unqueryable, and the portal needs mutable state — open proposals, running
+tallies, the replay floor, rate limits. Snapshot is built the same way: IPFS
+receipts alongside its own centralised hub.
 
 ## Testing one person, one vote locally
 
@@ -159,11 +212,17 @@ app/
   api/proposals/           list + create (verifies author signature)
   api/proposals/[id]/      single proposal with live tally
   api/votes/               cast vote (verifies signature, reads power)
+  api/ipfs/                receipt coverage; /pin sweeps what went unpinned
 lib/
   voting.ts                tally engine for all six systems
   voting-power.ts          balance and identity strategies
   eip712.ts                signing domain, types, canonical encoding
+  receipts.ts              what gets pinned, and how anyone verifies it
+  ipfs.ts                  pinning providers (server only)
   chains.ts                Redbelly mainnet + testnet
+scripts/
+  import-snapshot.mjs      pull a Snapshot space in
+  rebuild-from-ipfs.mjs    rebuild the tables from pinned receipts alone
 components/
   vote-panel.tsx           input UI for every voting system
   results-panel.tsx        scores, quorum, elimination rounds

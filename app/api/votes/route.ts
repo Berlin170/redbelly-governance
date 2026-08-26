@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { verifyTypedData, getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isMissingColumn } from "@/lib/pg-errors";
+import { pinAndRecord } from "@/lib/ipfs";
+import { voteReceipt } from "@/lib/receipts";
 import { domain, voteTypes, canonicalChoice } from "@/lib/eip712";
 import {
   getVotingPower,
@@ -182,29 +184,84 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: reason }, { status: 403 });
     }
 
-    const { data, error } = await db
+    const row: Record<string, unknown> = {
+      proposal_id: proposal.id,
+      voter,
+      choice,
+      voting_power: votingPower,
+      // Stored so the replay floor survives, and so the published
+      // signature can finally be re-verified against the published row:
+      // rebuilding the signed payload needs this timestamp. Omitted
+      // entirely where the column has yet to exist, so the write still
+      // lands rather than failing on an unknown field.
+      ...(guarded ? { signed_at: signedAt } : {}),
+      reason: message.reason || null,
+      signature,
+      // Cleared, not left alone. This is an upsert: changing your vote
+      // rewrites the row, and the receipt pinned for the ballot it replaced
+      // describes a choice this row no longer holds. A stale receipt is worse
+      // than none — it would show a reader the wrong vote, signed. The pin
+      // below fills it back in moments later.
+      source_receipt: null,
+    };
+
+    let { data, error } = await db
       .from("votes")
-      .upsert(
-        {
-          proposal_id: proposal.id,
-          voter,
-          choice,
-          voting_power: votingPower,
-          // Stored so the replay floor survives, and so the published
-          // signature can finally be re-verified against the published row:
-          // rebuilding the signed payload needs this timestamp. Omitted
-          // entirely where the column has yet to exist, so the write still
-          // lands rather than failing on an unknown field.
-          ...(guarded ? { signed_at: signedAt } : {}),
-          reason: message.reason || null,
-          signature,
-        },
-        { onConflict: "proposal_id,voter" }
-      )
+      .upsert(row, { onConflict: "proposal_id,voter" })
       .select()
       .single();
 
+    // source_receipt arrived with migration 003, and a deployment can still be
+    // ahead of its database. Receipts are a second copy of the record; being
+    // unable to file one is never a reason to refuse the ballot itself.
+    if (error && isMissingColumn(error)) {
+      console.warn(
+        "[votes] source_receipt is missing — IPFS receipts are OFF until " +
+          "supabase/003_copeland.sql has been run."
+      );
+      delete row.source_receipt;
+      ({ data, error } = await db
+        .from("votes")
+        .upsert(row, { onConflict: "proposal_id,voter" })
+        .select()
+        .single());
+    }
+
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Pinned after the response, never before it. The vote is already durable
+    // in the database; the receipt is the copy that lets someone check it
+    // without us. Waiting on a pinning provider to answer before telling a
+    // member their vote was counted would trade the thing that matters for the
+    // thing that corroborates it, and hand a third party a veto over the DAO's
+    // ability to vote at all.
+    const pinned = data;
+    after(async () => {
+      await pinAndRecord({
+        table: "votes",
+        id: pinned.id,
+        name: `vote-${proposal.id}-${voter}`,
+        receipt: voteReceipt(
+          {
+            from: message.from,
+            space: message.space,
+            proposal: message.proposal,
+            choice: message.choice,
+            reason: message.reason ?? "",
+            timestamp: signedAt,
+          },
+          signature,
+          {
+            proposal_id: proposal.id,
+            voting_power: votingPower,
+            created_at: pinned.created_at ?? null,
+            vote_id: pinned.id,
+          }
+        ),
+        db,
+      });
+    });
+
     return NextResponse.json({ vote: data }, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Could not record the vote.";

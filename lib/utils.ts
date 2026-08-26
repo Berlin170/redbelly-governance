@@ -59,12 +59,29 @@ export function timeAgo(iso: string) {
 }
 
 /**
- * Snapshot pins every proposal and ballot to IPFS. Linking the receipt turns
- * an imported record from something you take on our word into something you
- * can check against the original, signature and all.
+ * Every proposal and ballot is pinned to IPFS, ours as well as Snapshot's.
+ * Linking the receipt turns a record from something you take on our word into
+ * something you can check yourself, signature and all.
+ *
+ * The gateway depends on where the record was pinned. Any gateway can serve
+ * any CID in principle, but only in principle: a gateway will not hand you
+ * bytes nobody near it is holding. Imported receipts live on Snapshot's own
+ * infrastructure and resolve there reliably; ours live wherever we pinned
+ * them. Sending a reader to the gateway whose operator is actually paying to
+ * keep the file is the difference between a link that verifies a vote and a
+ * link that times out.
  */
-export function receiptUrl(cid: string | null | undefined) {
+const NATIVE_GATEWAY = (
+  process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? "https://ipfs.io"
+).replace(/\/$/, "");
+
+export function receiptUrl(
+  cid: string | null | undefined,
+  source?: "native" | "snapshot" | null
+) {
   if (!cid) return null;
   const hash = cid.replace(/^ipfs:\/\//, "");
-  return `https://snapshot.4everland.link/ipfs/${hash}`;
+  const base =
+    source === "snapshot" ? "https://snapshot.4everland.link" : NATIVE_GATEWAY;
+  return `${base}/ipfs/${hash}`;
 }

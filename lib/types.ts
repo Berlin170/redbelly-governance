@@ -75,6 +75,13 @@ export interface Proposal {
   end_at: string;
   created_at: string;
   signature: string | null;
+  /**
+   * Unix seconds from the signed payload, kept so the stored signature can be
+   * rebuilt and re-checked. Null on imported history and on proposals opened
+   * before migration 008; those cannot be pinned, because a receipt whose
+   * payload cannot be reconstructed proves nothing.
+   */
+  signed_at?: number | null;
   results_hash: string | null;
   anchor_tx: string | null;
 
@@ -97,7 +104,11 @@ export interface Proposal {
   source_scores_total: number | null;
   source_vote_count: number | null;
 
-  /** IPFS receipt at the source, so an imported proposal stays auditable. */
+  /**
+   * IPFS CID of the signed record. Snapshot's own pin on imported proposals,
+   * this portal's pin of the EIP-712 envelope on native ones — `source` says
+   * which, and receiptUrl() picks the gateway from it.
+   */
   source_receipt: string | null;
 
   /** Attached by the list endpoint so cards can show counts without N+1 reads. */
@@ -124,7 +135,7 @@ export interface Vote {
 
   source?: "native" | "snapshot";
   source_id?: string | null;
-  /** IPFS receipt at the source, so an imported ballot stays auditable. */
+  /** IPFS CID of the signed ballot. See Proposal.source_receipt. */
   source_receipt?: string | null;
   voted_at?: string | null;
 }

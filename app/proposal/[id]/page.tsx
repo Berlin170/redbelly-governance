@@ -229,16 +229,20 @@ export default function ProposalPage({
                         : "Imported — not signed on this portal"
                     }
                   />
-                  {/* An imported proposal carries no signature over our
-                      domain, so point at the signed original instead of
-                      asking anyone to take this record on trust. */}
-                  {receiptUrl(proposal.source_receipt) && (
+                  {/* Imported proposals carry no signature over our domain,
+                      so their link points at the signed original. Proposals
+                      opened here link to our own pin of the payload their
+                      author signed — either way, nobody has to take this
+                      record on trust because the site says so. */}
+                  {receiptUrl(proposal.source_receipt, proposal.source) && (
                     <div className="flex items-baseline justify-between gap-4">
                       <span className="shrink-0 text-muted-foreground">
-                        Signed original
+                        {proposal.source === "snapshot"
+                          ? "Signed original"
+                          : "IPFS receipt"}
                       </span>
                       <a
-                        href={receiptUrl(proposal.source_receipt)!}
+                        href={receiptUrl(proposal.source_receipt, proposal.source)!}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center text-right text-primary hover:underline"
