@@ -13,6 +13,27 @@ import type { Proposal, Vote } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * How long the CDN may serve this list without asking us again.
+ *
+ * Building it costs two round trips — every proposal in the space, then every
+ * ballot in it — and then a tally per proposal. That was about two seconds of
+ * server time on every single visit, paid again for each visitor, to produce a
+ * page that changes when someone opens a proposal or casts a vote. Neither
+ * happens thirty times a minute in a DAO.
+ *
+ * Thirty seconds is not a number picked for feel: `useProposals` already sets
+ * `staleTime: 30_000`, so the client had long since decided a half-minute-old
+ * list was current enough. This makes the CDN agree with it rather than
+ * rebuilding from scratch behind a client that was not going to look.
+ *
+ * The one person who would notice staleness is whoever just published a
+ * proposal, and they never see this list — `/create` redirects them to
+ * `/proposal/{id}`, which is not cached. Same for voting: the detail endpoint
+ * stays uncached, so a ballot always shows up the moment it is counted.
+ */
+const LIST_CACHE = "public, s-maxage=30, stale-while-revalidate=60";
+
 export async function GET(req: NextRequest) {
   const space = req.nextUrl.searchParams.get("space") ?? process.env.NEXT_PUBLIC_SPACE_ID!;
   const db = supabaseAdmin();
@@ -26,7 +47,9 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const proposals = (data ?? []) as Proposal[];
-  if (proposals.length === 0) return NextResponse.json({ proposals: [] });
+  if (proposals.length === 0) {
+    return NextResponse.json({ proposals: [] }, { headers: { "Cache-Control": LIST_CACHE } });
+  }
 
   // One read for every ballot in the space rather than a query per proposal.
   // At DAO scale (hundreds of votes) this is cheaper than the round trips.
@@ -54,7 +77,13 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  return NextResponse.json({ proposals: enriched });
+  // Only the successful list is cached. An error must not be, or one bad
+  // minute at the database would be served to everyone for the next thirty
+  // seconds after it had already recovered.
+  return NextResponse.json(
+    { proposals: enriched },
+    { headers: { "Cache-Control": LIST_CACHE } }
+  );
 }
 
 export async function POST(req: NextRequest) {
