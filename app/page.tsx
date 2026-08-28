@@ -6,6 +6,7 @@ import { SpaceHeader } from "@/components/space-header";
 import { StatStrip } from "@/components/stat-strip";
 import { ProposalRow, EmptyRows } from "@/components/proposal-row";
 import { useProfiles } from "@/lib/use-profiles";
+import { useMyVotes } from "@/lib/use-my-votes";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProposals } from "@/lib/use-proposals";
@@ -40,6 +41,9 @@ export default function OverviewPage() {
   const { data: proposals, error, isLoading } = useProposals();
   // Every author on the page resolved in one request, then handed to each row.
   const { data: profiles } = useProfiles((proposals ?? []).map((p) => p.author));
+  // Which of these the connected wallet has already voted on. One request
+  // for the whole list, resolved beside the profiles and passed to each row.
+  const { data: mine } = useMyVotes();
 
   const active = (proposals ?? []).filter(
     (p) => proposalState(p.start_at, p.end_at) === "active"
@@ -92,6 +96,7 @@ export default function OverviewPage() {
                     key={p.id}
                     item={p}
                     profile={profiles?.[p.author.toLowerCase()]}
+                    voted={mine?.has(p.id)}
                   />
                 ))}
               </div>
@@ -129,6 +134,7 @@ export default function OverviewPage() {
                     key={p.id}
                     item={p}
                     profile={profiles?.[p.author.toLowerCase()]}
+                    voted={mine?.has(p.id)}
                   />)
               )}
             </div>

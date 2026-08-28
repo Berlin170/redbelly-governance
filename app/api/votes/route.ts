@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { verifyTypedData, getAddress } from "viem";
+import { verifyTypedData, getAddress, isAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isMissingColumn } from "@/lib/pg-errors";
 import { pinAndRecord } from "@/lib/ipfs";
@@ -15,6 +15,42 @@ import { validateChoice } from "@/lib/voting";
 import { LIMITS, MAX_CLOCK_SKEW_SECONDS } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/votes?voter=0x… — which proposals this address has already voted on.
+ *
+ * Kept apart from the proposal list rather than folded into it. That list is
+ * cached at the edge and served to everyone, so the moment it carried a
+ * "you voted" flag it would be one visitor's answer handed to the next. This
+ * is the per-visitor half, asked separately and never cached.
+ */
+export async function GET(req: NextRequest) {
+  const voter = req.nextUrl.searchParams.get("voter");
+  const nothing = NextResponse.json(
+    { proposals: [] },
+    { headers: { "Cache-Control": "private, no-store" } }
+  );
+
+  if (!voter || !isAddress(voter)) return nothing;
+
+  // ilike, not eq: native ballots are stored checksummed by getAddress while
+  // imported ones carry whatever casing Snapshot recorded, so a case-sensitive
+  // match would quietly drop a member's entire Snapshot voting history. An
+  // address is 0x plus hex, so it can hold neither of ilike's wildcards.
+  const { data, error } = await supabaseAdmin()
+    .from("votes")
+    .select("proposal_id")
+    .ilike("voter", voter);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(
+    { proposals: (data ?? []).map((v) => v.proposal_id) },
+    { headers: { "Cache-Control": "private, no-store" } }
+  );
+}
 
 export async function POST(req: NextRequest) {
   try {

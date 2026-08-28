@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, MessageSquare, ShieldCheck } from "lucide-react";
 import { VotePanel } from "@/components/vote-panel";
@@ -50,6 +51,15 @@ export default function ProposalPage({
   }, [id]);
 
   useEffect(load, [load]);
+
+  // A fresh ballot changes an answer this page does not own: the "voted" tick
+  // the proposal lists show. Reloading only this page would leave the member
+  // to navigate back to a list still saying they had not voted.
+  const queryClient = useQueryClient();
+  const onVoted = useCallback(() => {
+    load();
+    queryClient.invalidateQueries({ queryKey: ["my-votes"] });
+  }, [load, queryClient]);
 
   // Declared above the early returns: the page bails out to an error or a
   // skeleton below, and a hook that runs only sometimes is not a hook.
@@ -260,7 +270,7 @@ export default function ProposalPage({
 
         <div className="space-y-4 lg:sticky lg:top-20">
           {state === "active" && (
-            <VotePanel proposal={proposal} votes={votes} onVoted={load} />
+            <VotePanel proposal={proposal} votes={votes} onVoted={onVoted} />
           )}
           <ResultsPanel
             results={results}

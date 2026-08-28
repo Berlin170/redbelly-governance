@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MinusCircle, ArrowDownToLine } from "lucide-react";
+import { MinusCircle, ArrowDownToLine, Check } from "lucide-react";
 import { AddressAvatar } from "@/components/address-avatar";
 import { StatusBadge } from "@/components/status-badge";
 import { choiceShares } from "@/lib/results";
@@ -123,9 +123,12 @@ function ResultSummary({ item }: { item: ProposalListItem }) {
 export function ProposalRow({
   item,
   profile,
+  voted,
 }: {
   item: ProposalListItem;
   profile?: Profile;
+  /** True when the connected wallet has a ballot on this proposal. */
+  voted?: boolean;
 }) {
   const state = proposalState(item.start_at, item.end_at);
   const outcome = state === "closed" ? outcomeOf(item, item.results) : undefined;
@@ -173,6 +176,21 @@ export function ProposalRow({
                   ? `opens ${timeAgo(item.start_at).replace(" ago", "")}`
                   : timeLeft(item.end_at)}
             </span>
+
+            {/* Answers "have I dealt with this one" without opening it. The
+                word carries the meaning and the tick only reinforces it, so
+                the row still reads for anyone who cannot separate the green
+                from the grey beside it. */}
+            {voted && (
+              <span
+                className="inline-flex items-center gap-1"
+                title="You have voted on this proposal"
+              >
+                <span className="text-border">·</span>
+                <Check className="size-3 text-status-active" />
+                voted
+              </span>
+            )}
 
             {/* Provenance is a footnote, not a headline. It sits at the end of
                 the metadata in the same weight as everything else there. */}

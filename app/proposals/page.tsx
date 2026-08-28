@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { ProposalRow, EmptyRows } from "@/components/proposal-row";
 import { useProfiles } from "@/lib/use-profiles";
+import { useMyVotes } from "@/lib/use-my-votes";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -91,6 +92,9 @@ function ProposalsList() {
   const { data: proposals, error, isLoading } = useProposals();
   // Every author on the page resolved in one request, then handed to each row.
   const { data: profiles } = useProfiles((proposals ?? []).map((p) => p.author));
+  // Which of these the connected wallet has already voted on. One request
+  // for the whole list, resolved beside the profiles and passed to each row.
+  const { data: mine } = useMyVotes();
 
   const [lane, setLane] = useState<Lane>("all");
   const [sort, setSort] = useState<SortKey>("newest");
@@ -242,6 +246,7 @@ function ProposalsList() {
                     key={p.id}
                     item={p}
                     profile={profiles?.[p.author.toLowerCase()]}
+                    voted={mine?.has(p.id)}
                   />)
         )}
       </div>
