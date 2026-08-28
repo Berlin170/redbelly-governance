@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Globe, LayoutList, Plus, Menu, ShieldCheck } from "lucide-react";
+import { Globe, LayoutList, Plus, Menu, ShieldCheck, Trophy } from "lucide-react";
 import { useSpace } from "@/components/space-provider";
 import { SpaceAvatar } from "@/components/space-avatar";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Overview", icon: Globe },
   { href: "/proposals", label: "Proposals", icon: LayoutList },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/safety", label: "Wallet safety", icon: ShieldCheck },
 ] as const;
 
@@ -27,12 +28,15 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="space-y-0.5">
       {NAV.map(({ href, label, icon: Icon }) => {
-        // `/` must not light up for every nested route, but a proposal detail
-        // page belongs under Proposals.
+        // `/` must not light up for every nested route, and a proposal detail
+        // page belongs under Proposals — but only under Proposals. Testing
+        // `/proposal` against every entry lit the last one too, so on a
+        // proposal page both Proposals and Wallet safety read as current.
         const active =
           href === "/"
             ? pathname === "/"
-            : pathname === href || pathname.startsWith("/proposal");
+            : pathname === href ||
+              (href === "/proposals" && pathname.startsWith("/proposal/"));
 
         return (
           <Link

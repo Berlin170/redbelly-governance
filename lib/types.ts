@@ -191,3 +191,17 @@ export interface Profile {
   signature: string;
   updated_at: string;
 }
+
+/**
+ * One member of the space, with what they have done in it. Counts are derived
+ * on read from the proposals and votes tables rather than stored, so nothing
+ * can drift out of step with the ballots it claims to summarise.
+ */
+export interface LeaderboardEntry {
+  /** As stored — checksummed on native rows, Snapshot's spelling on imports. */
+  address: string;
+  votes: number;
+  proposals: number;
+  /** Most recent ballot or proposal, ISO. Null only if both are missing. */
+  lastActive: string | null;
+}
