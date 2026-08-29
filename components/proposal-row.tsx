@@ -4,7 +4,7 @@ import Link from "next/link";
 import { MinusCircle, ArrowDownToLine, Check } from "lucide-react";
 import { AddressAvatar } from "@/components/address-avatar";
 import { StatusBadge } from "@/components/status-badge";
-import { choiceShares } from "@/lib/results";
+import { choiceLabelShares, choiceShares } from "@/lib/results";
 import { outcomeOf } from "@/lib/outcome";
 import {
   proposalState,
@@ -37,10 +37,11 @@ const color = (i: number) => CHART[i % CHART.length];
  */
 function ResultSummary({ item }: { item: ProposalListItem }) {
   const shares = choiceShares(item.results);
+  const labels = choiceLabelShares(item.results);
   const cast = item.results.total > 0;
 
   const ranked = shares
-    .map((share, i) => ({ share, i }))
+    .map((share, i) => ({ share, label: labels[i] ?? 0, i }))
     .filter((c) => c.share > 0.05)
     .sort((a, b) => b.share - a.share);
 
@@ -67,7 +68,7 @@ function ResultSummary({ item }: { item: ProposalListItem }) {
         className="flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary"
         role="img"
         aria-label={ranked
-          .map((c) => `${item.choices[c.i]} ${c.share.toFixed(0)}%`)
+          .map((c) => `${item.choices[c.i]} ${c.label.toFixed(0)}%`)
           .join(", ")}
       >
         {shares.map((share, i) =>
@@ -75,7 +76,7 @@ function ResultSummary({ item }: { item: ProposalListItem }) {
             <span
               key={i}
               style={{ width: `${share}%`, backgroundColor: color(i) }}
-              title={`${item.choices[i]} — ${share.toFixed(1)}%`}
+              title={`${item.choices[i]} — ${(labels[i] ?? 0).toFixed(1)}%`}
             />
           )
         )}
@@ -92,7 +93,7 @@ function ResultSummary({ item }: { item: ProposalListItem }) {
               {item.choices[c.i]}
             </span>
             <span className="tabular shrink-0 font-medium text-foreground">
-              {c.share.toFixed(0)}%
+              {c.label.toFixed(0)}%
             </span>
           </span>
         ))}

@@ -68,3 +68,21 @@ export function choiceShares(results: TallyResult): number[] {
   if (results.total <= 0) return results.scores.map(() => 0);
   return results.scores.map((s) => (s / results.total) * 100);
 }
+
+/**
+ * The percentage to print beside a choice, which is not always the width of
+ * its bar.
+ *
+ * A stacked bar has to sum to 100 or it stops being a stacked bar, so
+ * `choiceShares` stays proportional. The printed number answers a different
+ * question — how much support does this choice have — and under approval one
+ * voter backs several choices, so that answer is measured against the power
+ * cast, exactly as the results panel and quorum do. Splitting the two keeps a
+ * row from disagreeing with the proposal page it links to.
+ */
+export function choiceLabelShares(results: TallyResult): number[] {
+  const denominator =
+    results.system === "approval" ? results.participation : results.total;
+  if (denominator <= 0) return results.scores.map(() => 0);
+  return results.scores.map((s) => (s / denominator) * 100);
+}
