@@ -159,13 +159,20 @@ Addresses are stored lowercase.
 
 The portal runs on Redbelly Mainnet (chain 151).
 
-**Identity verification is on chain.** `verified-identity` reads
-`isAllowed(address)` on Redbelly's network access contract,
-`0xcb385cD90ca6b219798F57B4a7958897e91A9163`. An address answers true only if
-its owner claimed a Receptor access credential, which requires a passport
-verified by biometric check, so eligibility comes from the protocol rather than
-a list this server keeps. Set `NEXT_PUBLIC_IDENTITY_REGISTRY` only to override
-that address.
+**Identity verification is on chain.** `verified-identity` reads Redbelly's
+network access contract, resolved by asking the bootstrap registry
+`0xDAFEA492D9c6733ae3d56b7Ed1ADB60692c98Bc5` for `"permission"` — today
+`0xcb385cD90ca6b219798F57B4a7958897e91A9163`, which stays compiled in as the
+fallback. Eligibility comes from the protocol rather than a list this server
+keeps. Set `NEXT_PUBLIC_IDENTITY_REGISTRY` only to override that address.
+
+**A verified voter is a person, not a company.** `isAllowed` alone is not that
+test: it also answers true for businesses, which are granted through separate
+extender contracts, and it answers true for *every* address if permissioned
+access is ever switched off. So an individual is an address the access
+contract allows, that no extender claims, while permissioned access is on. The
+passport check behind the individual path happens off chain at the issuer;
+what the chain carries is the credential presented to `request`.
 
 **The electorate is frozen at the proposal's snapshot block.** `isAllowed` is
 read at that block, not at vote time, so an address credentialed after a vote

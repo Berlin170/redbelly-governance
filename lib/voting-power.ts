@@ -1,5 +1,11 @@
 import { createPublicClient, http, formatEther, getAddress } from "viem";
-import { accessContract, activeChain, RPC_URL } from "./chains";
+import {
+  accessContract,
+  accessContractIsPinned,
+  activeChain,
+  bootstrapRegistry,
+  RPC_URL,
+} from "./chains";
 import { supabaseAdmin } from "./supabase";
 import { stakedBalance } from "./staking";
 import type { VotingStrategy } from "./types";
@@ -26,6 +32,82 @@ const erc20Abi = [
   },
 ] as const;
 
+const registryAbi = [
+  {
+    name: "getContractAddress",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "contractName", type: "string" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
+const permissionAbi = [
+  {
+    name: "isAllowed",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "_address", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    name: "isPermissionedAccessEnabled",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    name: "getPermissionExtenders",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address[]" }],
+  },
+] as const;
+
+/**
+ * Resolved once per process. The registry answer cannot change without a
+ * governance action on Redbelly's side, and re-reading it on every vote would
+ * add a round trip to a number that is stable for months.
+ */
+let resolvedPermission: `0x${string}` | null | undefined;
+
+/**
+ * Where the access contract lives.
+ *
+ * An explicit `NEXT_PUBLIC_IDENTITY_REGISTRY` wins outright — an operator who
+ * pinned an address meant it. Otherwise ask Redbelly's bootstrap registry for
+ * `"permission"`, which is how the protocol's own sample resolves it, and fall
+ * back to our compiled-in address if that read fails. The two agree today; the
+ * registry is what keeps them agreeing after a redeploy.
+ */
+async function permissionContract(): Promise<`0x${string}` | null> {
+  if (accessContractIsPinned()) return accessContract();
+  if (resolvedPermission !== undefined) return resolvedPermission;
+
+  const registry = bootstrapRegistry();
+  if (registry) {
+    try {
+      const found = await client.readContract({
+        address: registry,
+        abi: registryAbi,
+        functionName: "getContractAddress",
+        args: ["permission"],
+      });
+      if (found && BigInt(found) !== 0n) {
+        resolvedPermission = getAddress(found);
+        return resolvedPermission;
+      }
+    } catch {
+      // Fall through to the pinned address rather than failing the vote.
+    }
+  }
+
+  resolvedPermission = accessContract();
+  return resolvedPermission;
+}
+
 /**
  * Whether identity checks are backed by an on-chain contract rather than a
  * table this deployment controls.
@@ -37,17 +119,26 @@ export function identityRegistryConfigured(): boolean {
 /**
  * Identity-verified voting power.
  *
- * On mainnet this reads Redbelly's network access contract directly. An
- * address only returns true there if its owner claimed a Receptor access
- * credential, which requires a passport verified by biometric check — so the
- * answer comes from the protocol, not from a list this server keeps.
+ * On mainnet this reads Redbelly's network access contract directly, so the
+ * answer comes from the protocol rather than from a list this server keeps.
+ *
+ * `isAllowed` on its own is not the test we want. Its logic is "permissioned
+ * access off, or this address passed KYC, or some extender vouches for it",
+ * and the extenders are what grant *business* accounts. A registered company
+ * therefore answers true, and counting it as a person would hand a legal
+ * entity a human's vote. An individual is an address the access contract
+ * allows that no extender claims — the same rule Redbelly's own
+ * `permission-validation` sample uses to separate KYC from KYB.
  *
  * Note what this does and does not prove. It establishes that an address
  * belongs to a verified person. It does not establish that two addresses
- * belong to two *different* people: one credential can enable several
- * accounts. Until a per-person nullifier is available, this is proof of
- * personhood per address, and a determined holder of several enabled accounts
- * could still vote more than once.
+ * belong to two *different* people: one passport can enable several accounts,
+ * measured at roughly ten. The complete `PermissionUpgradeable` ABI carries no
+ * function grouping addresses by identity, and the credential presented to
+ * `request` carries only `publicAddress`, so nothing on chain can close this.
+ * Until a per-person nullifier exists, this is proof of personhood per
+ * address, and a holder of several credentialed addresses can vote more than
+ * once — up to that ceiling, which is the honest claim to make for it.
  *
  * Eligibility is read at the proposal's snapshot block, not at vote time, for
  * the same reason balances are: the electorate is fixed when the proposal is
@@ -61,7 +152,7 @@ async function verifiedIdentityPower(
   voter: string,
   blockNumber?: number | null
 ): Promise<number> {
-  const registry = accessContract();
+  const registry = await permissionContract();
 
   if (!registry && !activeChain.testnet) {
     throw new Error(
@@ -72,22 +163,66 @@ async function verifiedIdentityPower(
   }
 
   if (registry) {
-    const isAllowed = await client.readContract({
-      address: registry,
-      abi: [
-        {
-          name: "isAllowed",
-          type: "function",
-          stateMutability: "view",
-          inputs: [{ name: "account", type: "address" }],
-          outputs: [{ name: "", type: "bool" }],
-        },
-      ] as const,
-      functionName: "isAllowed",
-      args: [getAddress(voter)],
-      ...(blockNumber ? { blockNumber: BigInt(blockNumber) } : {}),
-    });
-    return isAllowed ? 1 : 0;
+    const at = blockNumber ? { blockNumber: BigInt(blockNumber) } : {};
+    const address = getAddress(voter);
+
+    // `isAllowed` short-circuits to true for *everyone* when permissioned
+    // access is off. It is on today and the ABI offers no way to turn it back
+    // off, but an upgrade could, and the failure would be silent: an open gate
+    // that still reports each voter as verified. Check rather than trust.
+    const [enabled, allowed, extenders] = await Promise.all([
+      client.readContract({
+        address: registry,
+        abi: permissionAbi,
+        functionName: "isPermissionedAccessEnabled",
+        ...at,
+      }),
+      client.readContract({
+        address: registry,
+        abi: permissionAbi,
+        functionName: "isAllowed",
+        args: [address],
+        ...at,
+      }),
+      client.readContract({
+        address: registry,
+        abi: permissionAbi,
+        functionName: "getPermissionExtenders",
+        ...at,
+      }),
+    ]);
+
+    if (!enabled) {
+      throw new Error(
+        "Identity voting is disabled: Redbelly's permissioned access is off, " +
+          "so the access contract allows every address. Counting that as " +
+          "verified would open the gate to anyone."
+      );
+    }
+
+    if (!allowed) return 0;
+
+    // Extenders grant business accounts. Asked at the snapshot block like
+    // everything else, so the electorate stays fixed once voting opens.
+    //
+    // A read that fails is deliberately not treated as "not a business". We
+    // would not know either way, and the two errors are not equal: refusing a
+    // person their vote is loud and they say so, while admitting a company as
+    // a person is silent and corrupts the tally. So an unreadable extender
+    // fails the whole check rather than quietly granting the vote.
+    const businessChecks = await Promise.all(
+      extenders.map((extender) =>
+        client.readContract({
+          address: extender,
+          abi: permissionAbi,
+          functionName: "isAllowed",
+          args: [address],
+          ...at,
+        })
+      )
+    );
+
+    return businessChecks.some(Boolean) ? 0 : 1;
   }
 
   const { data } = await supabaseAdmin()

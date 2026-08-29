@@ -30,15 +30,32 @@ export const redbellyTestnet = defineChain({
 
 /**
  * Redbelly's network access contract. Every account must call `request(...)`
- * on it to gain write access, which requires a Receptor access credential
- * backed by a biometric passport check — so `isAllowed(address)` is a public,
- * permissionless read of whether an address belongs to a verified person.
+ * on it to gain write access, which requires a credential issued against a
+ * biometric passport check — so `isAllowed(address)` is a public,
+ * permissionless read of whether an address is permitted on the network.
+ *
+ * Note that `isAllowed` alone is NOT a test for a natural person. Businesses
+ * are granted through separate extender contracts and answer true here too;
+ * see `isIdentityVerified` in `voting-power.ts` for the individual-person test.
  *
  * Deployed on mainnet only; testnet has no equivalent at this address.
  * Override with NEXT_PUBLIC_IDENTITY_REGISTRY if Redbelly redeploys it.
  */
 export const REDBELLY_ACCESS_CONTRACT: Record<number, `0x${string}`> = {
   151: "0xcb385cD90ca6b219798F57B4a7958897e91A9163",
+};
+
+/**
+ * Redbelly's bootstrap registry, which resolves core contracts by name.
+ * `getContractAddress("permission")` returns the access contract above, so we
+ * prefer asking the registry over trusting a pinned address that a redeploy
+ * would silently invalidate. The pin stays as the fallback for when the
+ * registry read fails, and an explicit env override still wins over both.
+ *
+ * The name is case-sensitive: "permission" resolves, "Permission" reverts.
+ */
+export const BOOTSTRAP_CONTRACTS_REGISTRY: Record<number, `0x${string}`> = {
+  151: "0xDAFEA492D9c6733ae3d56b7Ed1ADB60692c98Bc5",
 };
 
 /**
@@ -57,6 +74,16 @@ export function accessContract(): `0x${string}` | null {
   const override = process.env.NEXT_PUBLIC_IDENTITY_REGISTRY;
   if (override) return override as `0x${string}`;
   return REDBELLY_ACCESS_CONTRACT[CHAIN_ID] ?? null;
+}
+
+/** Whether an explicit override is set, which the registry must not overrule. */
+export function accessContractIsPinned(): boolean {
+  return !!process.env.NEXT_PUBLIC_IDENTITY_REGISTRY;
+}
+
+/** The bootstrap registry for the active chain, if there is one. */
+export function bootstrapRegistry(): `0x${string}` | null {
+  return BOOTSTRAP_CONTRACTS_REGISTRY[CHAIN_ID] ?? null;
 }
 
 export function explorerTx(hash: string) {
