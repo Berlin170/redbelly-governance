@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConnectWallet } from "@/components/connect-wallet";
+import { useSpace } from "@/components/space-provider";
 import { domain, proposalTypes } from "@/lib/eip712";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import { accessContract, activeChain } from "@/lib/chains";
@@ -58,10 +59,26 @@ export default function CreatePage() {
   // Mirrors the proposal-validation check in the API. Signing is free but not
   // frictionless, and being told no after the wallet popup is a worse
   // experience than being told the rule before touching it.
+  //
+  // The exemption has to be mirrored too. The API waives the threshold for
+  // space admins, so a form that only weighed the balance disabled the button
+  // for the very people it told were exempt. Compared lowercased, exactly as
+  // the API does it.
+  const { space } = useSpace();
   const { data: balance } = useBalance({ address });
   const held = balance ? Number(balance.formatted) : 0;
+  const isAdmin = Boolean(
+    address &&
+      (space?.admins ?? []).some(
+        (a) => a.toLowerCase() === address.toLowerCase()
+      )
+  );
   const belowThreshold =
-    PROPOSAL_THRESHOLD > 0 && !!address && !!balance && held < PROPOSAL_THRESHOLD;
+    PROPOSAL_THRESHOLD > 0 &&
+    !isAdmin &&
+    !!address &&
+    !!balance &&
+    held < PROPOSAL_THRESHOLD;
   const { signTypedDataAsync } = useSignTypedData();
 
   const [title, setTitle] = useState("");
