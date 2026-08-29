@@ -338,6 +338,7 @@ export function tally(
       pairwise,
       ranking,
       voterCount,
+      participation,
       scoreUnit: "wins",
       quorumReached: quorum <= 0 || participation >= quorum,
     };
@@ -353,6 +354,7 @@ export function tally(
       winner,
       rounds,
       voterCount,
+      participation: total,
       scoreUnit: "power",
       quorumReached: quorum <= 0 || total >= quorum,
     };
@@ -384,6 +386,7 @@ export function tally(
     total,
     winner,
     voterCount,
+    participation,
     scoreUnit: "power",
     quorumReached: quorum <= 0 || participation >= quorum,
   };

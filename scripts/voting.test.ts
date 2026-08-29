@@ -126,6 +126,27 @@ console.log("\nother systems");
 }
 
 {
+  // The denominator the results panel divides by. Summing the scores would
+  // report each of these as 50% when in truth every voter approved both, so
+  // participation counts each voter once however many boxes they ticked.
+  const both = tally("approval", [ballot(1, [1, 2]), ballot(1, [1, 2])], 3);
+  check("approval participation counts voters, not approvals", both.participation, 2);
+  check("approval scores still sum above participation", both.total, 4);
+  check(
+    "a choice everyone approved is a full share of the power cast",
+    (both.scores[0] / both.participation) * 100,
+    100
+  );
+
+  // And a choice nobody picked stays at nothing.
+  check("an unapproved choice scores zero", both.scores[2], 0);
+
+  // Single choice is unaffected: there, the two denominators coincide.
+  const single = tally("single-choice", [ballot(3, 1), ballot(1, 2)], 2);
+  check("single choice participation equals its total", single.participation, single.total);
+}
+
+{
   // Weighted splits power by share of the weights, not by raw weight.
   const r = tally("weighted", [ballot(9, { "1": 2, "2": 1 })], 2);
   check("weighted splits power proportionally", r.scores, [6, 3]);

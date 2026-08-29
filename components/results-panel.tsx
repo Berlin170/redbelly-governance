@@ -26,6 +26,14 @@ export function ResultsPanel({
   const hasPairwise = results.system === "copeland" && !!results.pairwise;
   const isCopeland = results.scoreUnit === "wins";
 
+  // Approval asks a separate yes/no about every choice, so a share is "how
+  // much of the power in the room backed this one", not "what fraction of the
+  // ballot did it get". Dividing by the summed score instead would shrink
+  // every candidate as voters approve more of them, and report a candidate
+  // nobody rejected as a minority. These deliberately do not sum to 100.
+  const isApproval = results.system === "approval";
+  const denominator = isApproval ? results.participation : results.total;
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -35,7 +43,7 @@ export function ResultsPanel({
         <div className="space-y-3">
           {choices.map((choice, i) => {
             const score = results.scores[i] ?? 0;
-            const share = results.total > 0 ? (score / results.total) * 100 : 0;
+            const share = denominator > 0 ? (score / denominator) * 100 : 0;
             const isWinner = results.winner === i + 1 && score > 0;
 
             return (
@@ -64,6 +72,13 @@ export function ResultsPanel({
             );
           })}
         </div>
+
+        {isApproval && (
+          <p className="text-xs text-muted-foreground">
+            Each figure is the share of voting power that approved that choice.
+            Voters may approve several, so these do not add up to 100%.
+          </p>
+        )}
 
         <div className="flex items-center justify-between border-t border-border pt-4 text-sm">
           <span className="text-muted-foreground">Voters</span>

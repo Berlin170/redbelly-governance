@@ -165,6 +165,17 @@ export interface TallyResult {
   quorumReached: boolean;
   voterCount: number;
   /**
+   * Voting power actually cast, counting each voter once.
+   *
+   * Distinct from `total`, which sums the scores. Under approval one voter
+   * contributes to several choices, so the summed score exceeds the power in
+   * the room and is the wrong denominator for "how much support does this
+   * choice have" — a candidate approved by everyone would read as a fraction
+   * purely because voters were generous. Quorum already measures against this;
+   * the results panel now does too.
+   */
+  participation: number;
+  /**
    * What `scores` are counted in. Copeland scores matchup wins; everything
    * else sums voting power. Imported results keep the source's own unit.
    */

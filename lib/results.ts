@@ -44,6 +44,9 @@ export function resultsFor(proposal: Proposal, votes: Vote[]): TallyResult {
       winner,
       pairwise,
       voterCount: proposal.source_vote_count ?? votes.length,
+      // Imported tallies arrive already summed, with no per-voter breakdown to
+      // recover the power actually cast from, so the two coincide by default.
+      participation: total,
       scoreUnit: "power",
       quorumReached: quorum <= 0 || total >= quorum,
     };
