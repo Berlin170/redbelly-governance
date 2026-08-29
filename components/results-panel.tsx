@@ -34,6 +34,16 @@ export function ResultsPanel({
   const isApproval = results.system === "approval";
   const denominator = isApproval ? results.participation : results.total;
 
+  // "Leading" is a claim about being ahead, so it has to be withheld when
+  // nothing is. `winner` resolves ties to whichever choice was listed first,
+  // which is fine for picking a single label but would badge one of two equal
+  // candidates as beating the other. Scores are floats once weighting is
+  // involved, so compare with a tolerance rather than for exact equality.
+  const EPSILON = 1e-9;
+  const atTop = (score: number) =>
+    score > 0 && Math.abs(score - max) < EPSILON;
+  const leaderCount = results.scores.filter(atTop).length;
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -44,7 +54,7 @@ export function ResultsPanel({
           {choices.map((choice, i) => {
             const score = results.scores[i] ?? 0;
             const share = denominator > 0 ? (score / denominator) * 100 : 0;
-            const isWinner = results.winner === i + 1 && score > 0;
+            const isWinner = atTop(score);
 
             return (
               <div key={i} className="space-y-1.5">
@@ -52,7 +62,9 @@ export function ResultsPanel({
                   <span className={isWinner ? "font-medium" : ""}>
                     {choice}
                     {isWinner && (
-                      <span className="ml-2 text-xs text-primary">Leading</span>
+                      <span className="ml-2 text-xs text-primary">
+                        {leaderCount > 1 ? "Tied" : "Leading"}
+                      </span>
                     )}
                   </span>
                   <span className="tabular text-muted-foreground">
