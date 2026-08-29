@@ -107,7 +107,11 @@ export function ResultsPanel({
                   : "tabular text-status-pending"
               }
             >
-              {formatPower(results.total)} / {formatPower(quorum)}
+              {/* participation, not the summed score: this has to be the same
+                  number quorumReached was decided on, or the panel argues with
+                  its own verdict. Under approval the sum is larger, so showing
+                  it would report a quorum that was never met. */}
+              {formatPower(results.participation)} / {formatPower(quorum)}
               {results.quorumReached ? " reached" : " needed"}
             </span>
           </div>

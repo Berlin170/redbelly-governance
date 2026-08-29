@@ -153,6 +153,18 @@ console.log("\nother systems");
 }
 
 {
+  // Four voters approving three candidates each sum to twelve, but only four
+  // people were in the room. Quorum is about the room, so a quorum of ten is
+  // NOT reached — and the panel must show the four it was judged on, never the
+  // twelve, or it reports a shortfall as a surplus.
+  const votes = [1, 2, 3, 4].map(() => ballot(1, [1, 2, 3]));
+  const r = tally("approval", votes, 3, 10);
+  check("summed approvals exceed the quorum", r.total >= 10, true);
+  check("but the room did not reach it", r.quorumReached, false);
+  check("and participation is what was judged", r.participation, 4);
+}
+
+{
   const r = tally("single-choice", [ballot(10, 1)], 2, 50);
   check("quorum below threshold is not reached", r.quorumReached, false);
   check(
