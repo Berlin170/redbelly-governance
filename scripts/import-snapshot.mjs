@@ -81,6 +81,23 @@ async function db(path, { method = "POST", body, headers = {} } = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+/**
+ * Union of two address lists, compared case-insensitively but stored in the
+ * form already on the row. Addresses arrive checksummed from one source and
+ * lowercased from another, so comparing raw strings would let the same wallet
+ * be added twice.
+ */
+function mergeAddresses(current, incoming) {
+  const out = [...(current ?? [])];
+  const seen = new Set(out.map((a) => a.toLowerCase()));
+  for (const address of incoming ?? []) {
+    if (seen.has(address.toLowerCase())) continue;
+    seen.add(address.toLowerCase());
+    out.push(address);
+  }
+  return out;
+}
+
 /** ipfs:// links do not load in a browser; use Snapshot's own CDN instead. */
 function avatarUrl(raw) {
   if (!raw) return null;
@@ -119,6 +136,25 @@ async function importSpace() {
 
   if (!space) throw new Error(`Snapshot space "${SNAPSHOT_SPACE}" not found`);
 
+  // Admins granted on this portal do not exist in Snapshot's list, and writing
+  // Snapshot's list over ours drops them without a word — the only symptom
+  // being a proposal refused later for want of the RBNT threshold, with
+  // nothing pointing back at this script. Merge instead, keeping whatever is
+  // already there.
+  const existing =
+    (await db(`spaces?id=eq.${encodeURIComponent(SPACE_ID)}&select=admins,members`, {
+      method: "GET",
+    })) ?? [];
+  const current = existing[0] ?? {};
+
+  const admins = mergeAddresses(current.admins, space.admins);
+  const members = mergeAddresses(current.members, space.members);
+
+  const keptAdmins = admins.length - (space.admins ?? []).length;
+  if (keptAdmins > 0) {
+    console.log(`space     kept ${keptAdmins} portal admin(s) not in Snapshot`);
+  }
+
   await db("spaces?on_conflict=id", {
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: [
@@ -129,8 +165,8 @@ async function importSpace() {
         avatar_url: avatarUrl(space.avatar),
         symbol: space.symbol ?? null,
         followers_count: space.followersCount ?? 0,
-        admins: space.admins ?? [],
-        members: space.members ?? [],
+        admins,
+        members,
         website: space.website ?? null,
         twitter: space.twitter ? `https://x.com/${space.twitter}` : null,
         github: space.github ? `https://github.com/${space.github}` : null,
