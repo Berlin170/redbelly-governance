@@ -1,5 +1,12 @@
 # Redbelly Governance Portal
 
+> **The portal itself was written by [@Berlin170](https://github.com/Berlin170)**, who
+> built it to replace a Snapshot subscription for the Redbelly DAO. This copy carries
+> a UI redesign on the `redesign` branch — a design system, drawn art, four modals and
+> an accessibility gate — contributed by [@ickweb3](https://github.com/ickweb3).
+> Everything below this note is Berlin's documentation of his own work; see
+> [`DESIGN.md`](./DESIGN.md) for what the redesign changed and why.
+
 Gasless signature voting for the Redbelly DAO. Self-hosted, no subscription.
 
 Voters sign an EIP-712 message instead of sending a transaction, so voting is
