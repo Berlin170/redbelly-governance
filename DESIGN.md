@@ -142,6 +142,14 @@ bug and should stay visible in the report.
 
 Exits non-zero on a contrast or overflow failure, so it works as a gate.
 
+**One trap, and the gate now catches it.** Running `npm run build` while
+`next dev` is up overwrites `.next` with production output. The dev server then
+serves HTML whose client bundle 404s: every page renders its shell, never
+hydrates, and never fetches. All three checks pass — on a page with nothing in
+it. The script waits for the loading skeletons to clear, records whether they
+ever did, and fails the run if they did not. If you see *"never finished
+loading"*, stop the dev server, delete `.next`, restart, and run again.
+
 ## Working on this without database credentials
 
 `next dev` can render live production data with no secrets on the machine.
