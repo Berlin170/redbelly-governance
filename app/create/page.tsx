@@ -16,7 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ConnectWallet } from "@/components/connect-wallet";
+import { ProposalBody } from "@/components/proposal-body";
 import { useSpace } from "@/components/space-provider";
 import { domain, proposalTypes } from "@/lib/eip712";
 import { VOTING_SYSTEMS } from "@/lib/voting";
@@ -32,7 +41,7 @@ import { PROPOSAL_THRESHOLD } from "@/lib/limits";
  */
 const IDENTITY_REGISTRY = accessContract();
 import type { VotingStrategy, VotingSystem } from "@/lib/types";
-import { Plus, ShieldCheck, X } from "lucide-react";
+import { Eye, Plus, ShieldCheck, X } from "lucide-react";
 
 const STRATEGIES: { value: VotingStrategy; label: string; hint: string }[] = [
   {
@@ -90,6 +99,7 @@ export default function CreatePage() {
   const [quorum, setQuorum] = useState("0");
   const [days, setDays] = useState("5");
   const [submitting, setSubmitting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const systemMeta = VOTING_SYSTEMS.find((s) => s.value === system);
 
@@ -180,7 +190,7 @@ export default function CreatePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">New proposal</h1>
+        <h1 className="display-wide text-2xl">New proposal</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Publishing signs a message. It costs no gas.
         </p>
@@ -365,13 +375,30 @@ export default function CreatePage() {
 
           {isConnected ? (
             <div className="space-y-2">
-              <Button
-                onClick={submit}
-                disabled={submitting || belowThreshold}
-                className="w-full"
-              >
-                {submitting ? "Waiting for signature" : "Sign and publish"}
-              </Button>
+              <div className="flex gap-2">
+                {/*
+                  A published proposal cannot be edited, and the body is
+                  markdown nobody has seen rendered yet. Reading it once, laid
+                  out the way voters will read it, is the cheapest possible
+                  guard against a headline typo becoming permanent.
+                */}
+                <Button
+                  variant="outline"
+                  onClick={() => setPreviewing(true)}
+                  disabled={!title.trim()}
+                  className="flex-1"
+                >
+                  <Eye className="mr-1.5 size-4" />
+                  Preview
+                </Button>
+                <Button
+                  onClick={submit}
+                  disabled={submitting || belowThreshold}
+                  className="flex-1"
+                >
+                  {submitting ? "Waiting for signature" : "Sign and publish"}
+                </Button>
+              </div>
 
               {belowThreshold && (
                 <p className="text-center text-xs text-muted-foreground">
@@ -388,6 +415,88 @@ export default function CreatePage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={previewing} onOpenChange={setPreviewing}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Preview</DialogTitle>
+            <DialogDescription>
+              How this proposal will read once it is published. Nothing has been
+              signed yet.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+            <h2 className="display-wide text-xl leading-tight">
+              {title.trim() || "Untitled proposal"}
+            </h2>
+
+            {body.trim() ? (
+              <ProposalBody body={body} />
+            ) : (
+              <p className="text-sm italic text-muted-foreground">
+                No description. Voters will see only the title and the choices.
+              </p>
+            )}
+
+            <div className="space-y-2 border-t border-border pt-4">
+              <p className="eyebrow text-muted-foreground">Choices</p>
+              {choices
+                .filter((c) => c.trim())
+                .map((choice, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg border border-border px-4 py-2.5 text-sm"
+                  >
+                    {choice}
+                  </div>
+                ))}
+            </div>
+
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border pt-4 text-xs">
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">System</dt>
+                <dd className="text-right">
+                  {VOTING_SYSTEMS.find((s) => s.value === system)?.label}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Voting power</dt>
+                <dd className="text-right">
+                  {STRATEGIES.find((s) => s.value === strategy)?.label}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Open for</dt>
+                <dd className="tabular text-right">
+                  {days} {Number(days) === 1 ? "day" : "days"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">Quorum</dt>
+                <dd className="tabular text-right">
+                  {Number(quorum) > 0 ? Number(quorum).toLocaleString() : "None"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewing(false)}>
+              Keep editing
+            </Button>
+            <Button
+              onClick={() => {
+                setPreviewing(false);
+                submit();
+              }}
+              disabled={submitting || belowThreshold}
+            >
+              Sign and publish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

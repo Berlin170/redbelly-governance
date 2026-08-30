@@ -3,6 +3,11 @@
 import { useSpace } from "@/components/space-provider";
 import { useFollowers } from "@/lib/use-followers";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,31 +31,33 @@ function StatTile({ tile }: { tile: Tile }) {
   const lit = tile.live && tile.value > 0;
 
   return (
-    <div
-      className="min-w-0 px-4 py-3.5 sm:px-5"
-      title={tile.hint}
-    >
-      <div className="flex items-center gap-1.5">
-        {lit && (
-          <span className="relative grid size-1.5 shrink-0 place-items-center">
-            <span className="absolute size-1.5 animate-ping rounded-full bg-status-active/60" />
-            <span className="size-1.5 rounded-full bg-status-active" />
-          </span>
-        )}
-        <p className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          {tile.label}
-        </p>
-      </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="min-w-0 cursor-help px-4 py-4 sm:px-5">
+          <div className="flex items-center gap-1.5">
+            {lit && (
+              <span className="relative grid size-1.5 shrink-0 place-items-center">
+                <span className="absolute size-1.5 animate-ping rounded-full bg-status-active/60" />
+                <span className="size-1.5 rounded-full bg-status-active" />
+              </span>
+            )}
+            <p className="eyebrow truncate text-muted-foreground">
+              {tile.label}
+            </p>
+          </div>
 
-      <p
-        className={cn(
-          "tabular mt-1 text-2xl font-semibold leading-none tracking-tight",
-          lit ? "text-status-active" : "text-foreground"
-        )}
-      >
-        {tile.value.toLocaleString()}
-      </p>
-    </div>
+          <p
+            className={cn(
+              "figure mt-1.5 text-2xl leading-none sm:text-[1.625rem]",
+              lit ? "text-status-active" : "text-foreground",
+            )}
+          >
+            {tile.value.toLocaleString()}
+          </p>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>{tile.hint}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -60,11 +67,11 @@ export function StatStrip() {
 
   if (isLoading || !stats) {
     return (
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-3 lg:grid-cols-6">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-card px-4 py-3.5 sm:px-5">
+          <div key={i} className="bg-card px-4 py-4 sm:px-5">
             <Skeleton className="h-3 w-16" />
-            <Skeleton className="mt-2 h-6 w-12" />
+            <Skeleton className="mt-2.5 h-6 w-12" />
           </div>
         ))}
       </div>
@@ -111,7 +118,7 @@ export function StatStrip() {
   // The 1px grid gap over a border-coloured backdrop draws every divider,
   // including the ones between wrapped rows, without a rule per cell.
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-card sm:grid-cols-3 lg:grid-cols-6">
       {tiles.map((tile) => (
         <div key={tile.label} className="bg-card">
           <StatTile tile={tile} />

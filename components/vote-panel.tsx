@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
 import { toast } from "sonner";
@@ -8,13 +7,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ConnectWallet } from "@/components/connect-wallet";
+import { HowVotingWorks } from "@/components/how-voting-works";
 import { domain, voteTypes, buildVoteMessage } from "@/lib/eip712";
-import { validateChoice, VOTING_SYSTEMS } from "@/lib/voting";
+import { describeChoice, validateChoice, VOTING_SYSTEMS } from "@/lib/voting";
 import { cn } from "@/lib/utils";
 import { activeChain } from "@/lib/chains";
 import type { Proposal, Vote, VoteChoice } from "@/lib/types";
-import { ArrowDown, ArrowUp, Check, CheckCircle2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  CheckCircle2,
+  PenLine,
+  ShieldCheck,
+} from "lucide-react";
 
 export function VotePanel({
   proposal,
@@ -29,6 +44,10 @@ export function VotePanel({
   const { signTypedDataAsync } = useSignTypedData();
   const [submitting, setSubmitting] = useState(false);
   const [reason, setReason] = useState("");
+  /** The review step. A signature request is the moment a visitor is most
+   *  likely to bail, and the old flow threw the wallet prompt at them with no
+   *  statement of what they were about to sign. */
+  const [confirming, setConfirming] = useState(false);
 
   const system = proposal.voting_system;
   const choices = proposal.choices;
@@ -119,6 +138,17 @@ export function VotePanel({
     setRanking(next);
   }
 
+  /** Validate first, then show what is about to be signed. */
+  function review() {
+    try {
+      validateChoice(system, currentChoice(), choices.length);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Check your selection.");
+      return;
+    }
+    setConfirming(true);
+  }
+
   async function submit() {
     if (!address) return;
     const choice = currentChoice();
@@ -160,6 +190,7 @@ export function VotePanel({
       if (!res.ok) throw new Error(json.error ?? "The vote was not recorded.");
 
       toast.success("Vote recorded.");
+      setConfirming(false);
       onVoted();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "The vote was not recorded.";
@@ -345,15 +376,11 @@ export function VotePanel({
 
         {isConnected ? (
           <Button
-            onClick={submit}
+            onClick={review}
             disabled={submitting || power === 0}
             className="w-full"
           >
-            {submitting
-              ? "Waiting for signature"
-              : myVote
-                ? "Change vote"
-                : "Sign and vote"}
+            {myVote ? "Change vote" : "Review and sign"}
           </Button>
         ) : (
           <ConnectWallet />
@@ -378,9 +405,7 @@ export function VotePanel({
             ) : null}
             <p>
               Signing costs no gas. Your signature proves the vote is yours.{" "}
-              <Link href="/safety" className="underline hover:text-foreground">
-                Is this safe?
-              </Link>
+              <HowVotingWorks />
             </p>
           </div>
         )}
@@ -388,13 +413,87 @@ export function VotePanel({
         {!isConnected && (
           <p className="text-center text-xs text-muted-foreground">
             Voting is a signature, not a transaction. No gas, and nothing can
-            be moved.{" "}
-            <Link href="/safety" className="underline hover:text-foreground">
-              How this works
-            </Link>
+            be moved. <HowVotingWorks />
           </p>
         )}
       </CardContent>
+
+      {/*
+        The review step.
+
+        Signing a typed message on an unfamiliar site is the moment a careful
+        person stops, and the wallet's own prompt shows a payload most people
+        cannot read. Stating the ballot in plain words first — this choice,
+        this much power, and the fact that no transaction is being sent — is
+        the difference between a considered confirmation and a leap of faith.
+      */}
+      <Dialog open={confirming} onOpenChange={setConfirming}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm your vote</DialogTitle>
+            <DialogDescription>{proposal.title}</DialogDescription>
+          </DialogHeader>
+
+          <dl className="space-y-3 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="shrink-0 text-muted-foreground">Your choice</dt>
+              <dd className="text-right font-medium">
+                {describeChoice(system, currentChoice(), choices)}
+              </dd>
+            </div>
+
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="shrink-0 text-muted-foreground">Voting power</dt>
+              <dd className="tabular text-right">
+                {power !== null
+                  ? power.toLocaleString(undefined, {
+                      maximumFractionDigits: 4,
+                    })
+                  : "—"}
+                {proposal.strategy === "verified-identity"
+                  ? ""
+                  : ` ${activeChain.nativeCurrency.symbol}`}
+              </dd>
+            </div>
+
+            {reason.trim() && (
+              <div className="flex flex-col gap-1 border-t border-border pt-3">
+                <dt className="text-muted-foreground">Reason</dt>
+                <dd className="break-words text-xs leading-relaxed">
+                  {reason.trim()}
+                </dd>
+              </div>
+            )}
+          </dl>
+
+          <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">
+            <p className="flex gap-2">
+              <PenLine className="mt-0.5 size-3.5 shrink-0 text-primary" />
+              Your wallet will ask you to sign a message. This is not a
+              transaction — it costs no gas and cannot move anything you hold.
+            </p>
+            {myVote && (
+              <p className="flex gap-2">
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                This replaces the ballot you already cast on this proposal.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirming(false)}
+              disabled={submitting}
+            >
+              Back
+            </Button>
+            <Button onClick={submit} disabled={submitting}>
+              {submitting ? "Waiting for signature" : "Sign in wallet"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

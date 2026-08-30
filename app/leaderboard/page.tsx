@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddressAvatar } from "@/components/address-avatar";
 import { useProfiles, displayName } from "@/lib/use-profiles";
@@ -59,6 +60,11 @@ export default function LeaderboardPage() {
   const { address } = useAccount();
   const [sort, setSort] = useState<SortKey>("votes");
   const [query, setQuery] = useState("");
+  // 145 members in one table is roughly thirteen thousand pixels of scroll,
+  // and the long tail is all "1 vote, a year ago". The list is not ranked —
+  // see sortMembers — so a page break implies no standing, it just stops the
+  // page being a mile long.
+  const [limit, setLimit] = useState(40);
 
   // Every name on the page resolved in one request, capped where the profile
   // endpoint caps itself rather than sending it a list it would silently trim.
@@ -94,7 +100,7 @@ export default function LeaderboardPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Leaderboard</h1>
+        <h1 className="display-wide text-2xl">Members</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Everyone who has voted or opened a proposal here, imported Snapshot
           history included. <span className="tabular">{members?.length ?? 0}</span>{" "}
@@ -153,7 +159,7 @@ export default function LeaderboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visible.map((m) => {
+                {visible.slice(0, limit).map((m) => {
                   const profile = profiles?.[m.address.toLowerCase()];
                   const you =
                     !!address &&
@@ -169,7 +175,7 @@ export default function LeaderboardPage() {
                           href={explorerAddress(m.address)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-sm hover:text-primary"
+                          className="inline-flex min-h-6 items-center gap-2 py-1 text-sm hover:text-primary"
                         >
                           <AddressAvatar
                             address={m.address}
@@ -215,6 +221,17 @@ export default function LeaderboardPage() {
           </div>
         )}
       </div>
+
+      {visible.length > limit && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => setLimit((n) => n + 60)}
+        >
+          Show more · {(visible.length - limit).toLocaleString()} remaining
+        </Button>
+      )}
     </div>
   );
 }

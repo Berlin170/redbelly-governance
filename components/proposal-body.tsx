@@ -1,17 +1,47 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Button } from "@/components/ui/button";
+
+/** Past this height a body is collapsed behind a fade and a control. */
+const COLLAPSE_AT = 560;
 
 /**
  * Proposal bodies are markdown — imported ones especially, which arrive with
  * headings, tables and links. Rendering them raw turns a written proposal
  * into a wall of asterisks, so they go through a renderer with the element
  * styles set explicitly rather than relying on a typography plugin.
+ *
+ * Imported bodies can be very long: one in this space runs to roughly eight
+ * thousand pixels of flat paragraphs, which on a phone pushed the vote panel
+ * so far down the page that the primary action was effectively unreachable.
+ * Anything over a screen and a half is collapsed, and the reader opts in.
  */
 export function ProposalBody({ body }: { body: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [tall, setTall] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setTall(el.scrollHeight > COLLAPSE_AT + 120);
+  }, [body]);
+
   return (
-    <div className="text-sm leading-relaxed">
+    <div className="relative">
+      <div
+        ref={ref}
+        className="relative overflow-hidden text-sm leading-relaxed"
+        style={
+          tall && !open
+            ? { maxHeight: COLLAPSE_AT, transition: "max-height 320ms var(--ease-out)" }
+            : undefined
+        }
+      >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -81,6 +111,29 @@ export function ProposalBody({ body }: { body: string }) {
       >
         {body}
       </ReactMarkdown>
+      </div>
+
+      {tall && !open && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-card via-card/85 to-transparent" />
+      )}
+
+      {tall && (
+        <div className="relative mt-3 flex justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+          >
+            {open ? "Show less" : "Read the full proposal"}
+            <ChevronDown
+              className={`ml-1.5 size-3.5 transition-transform duration-200 ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
