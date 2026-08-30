@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHead } from "@/components/page-head";
 import { Skeleton } from "@/components/ui/skeleton";
 import { outcomeOf, type OutcomeKind } from "@/lib/outcome";
 import { useProposals } from "@/lib/use-proposals";
@@ -160,29 +161,27 @@ function ProposalsList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="display-wide text-2xl">Proposals</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {query ? (
-              <>
-                <span className="tabular">{searched.length}</span>{" "}
-                {searched.length === 1 ? "result" : "results"} for{" "}
-                <span className="text-foreground">&ldquo;{query}&rdquo;</span>
-              </>
-            ) : (
-              "Signature voting on Redbelly. No gas, no subscription."
-            )}
-          </p>
-        </div>
-
-        <Button asChild size="sm" className="gap-1.5">
-          <Link href="/create">
-            <Plus className="size-4" />
-            New proposal
-          </Link>
-        </Button>
-      </div>
+      <PageHead
+        title="Proposals"
+        action={
+          <Button asChild size="sm" className="gap-1.5">
+            <Link href="/create">
+              <Plus className="size-4" />
+              New proposal
+            </Link>
+          </Button>
+        }
+      >
+        {query ? (
+          <>
+            <span className="tabular">{searched.length}</span>{" "}
+            {searched.length === 1 ? "result" : "results"} for{" "}
+            <span className="text-foreground">&ldquo;{query}&rdquo;</span>
+          </>
+        ) : (
+          "Signature voting on Redbelly. No gas, no subscription."
+        )}
+      </PageHead>
 
       {/* Filters live in one row above the list, so the controls that change
           what you see never get separated from the thing they change. */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHead } from "@/components/page-head";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { voteTypes, domain } from "@/lib/eip712";
@@ -27,17 +28,11 @@ const NEVER = [
 export default function SafetyPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Connecting your wallet
-        </h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Voting here works the same way it does on Snapshot: you sign a
-          message, you never send a transaction. This page explains exactly
-          what that means, because &ldquo;trust us&rdquo; is not a security
-          model.
-        </p>
-      </div>
+      <PageHead title="Connecting your wallet">
+        Voting here works the same way it does on Snapshot: you sign a message,
+        you never send a transaction. This page explains exactly what that
+        means, because &ldquo;trust us&rdquo; is not a security model.
+      </PageHead>
 
       <Card>
         <CardHeader className="pb-3">

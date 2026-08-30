@@ -284,9 +284,30 @@ for (const [viewport, vpName] of VIEWPORTS) {
           waitUntil: "networkidle",
           timeout: 45000,
         });
+
+        /*
+          Wait for the data, and record whether it ever arrived.
+
+          A page whose client bundle 404s — which is what a `next build` run
+          against a live `next dev` leaves behind — renders the shell, never
+          hydrates, and never fetches. Every check below then passes on a page
+          with no content in it. A gate that reports green because it measured
+          nothing is worse than no gate, so an unresolved page is carried into
+          the report as a failure of the run rather than a pass.
+        */
+        const settled = await page
+          .waitForFunction(
+            () => document.querySelectorAll(".animate-pulse").length === 0,
+            null,
+            { timeout: 25000 },
+          )
+          .then(() => true)
+          .catch(() => false);
+
         // Let the entrance animations settle so nothing is measured mid-fade.
         await page.waitForTimeout(1400);
         const r = await page.evaluate(auditInPage);
+        r.settled = settled;
         results.push({ route, name, theme, viewport: vpName, ...r });
         process.stdout.write(
           `${vpName}/${theme}${route} — contrast ${r.contrast.length}, overflow ${r.overflow.length}, small ${r.small.length}\n`,
@@ -322,6 +343,8 @@ const decorativeCount = results.reduce(
   (n, r) => n + (r.decorative?.length ?? 0),
   0,
 );
+// Pages that never finished loading, and so were never really checked.
+const unsettled = results.filter((r) => r.settled === false);
 
 let md = `# UI audit\n\n`;
 md += `${ROUTES.length} routes x ${THEMES.length} themes x ${VIEWPORTS.length} viewports.\n\n`;
@@ -329,7 +352,19 @@ md += `| Check | Failures |\n|---|---|\n`;
 md += `| Text contrast below WCAG AA | ${contrastCount} |\n`;
 md += `| Horizontal overflow | ${overflowCount} |\n`;
 md += `| Tap targets under 24px | ${smallCount} |\n`;
-md += `| Low-contrast decorative text (exempt, reported) | ${decorativeCount} |\n\n`;
+md += `| Low-contrast decorative text (exempt, reported) | ${decorativeCount} |\n`;
+md += `| Pages that never finished loading | ${unsettled.length} |\n\n`;
+
+if (unsettled.length) {
+  md += `> **These pages were still loading when they were measured, so their results mean nothing.**\n`;
+  md += `> The usual cause is a clobbered \`.next\`: a \`next build\` run against a live \`next dev\`\n`;
+  md += `> leaves the client bundle 404ing, so the page renders its shell, never hydrates, and\n`;
+  md += `> never fetches. Stop the dev server, delete \`.next\`, restart, and run again.\n>\n`;
+  for (const r of unsettled) {
+    md += `> - ${r.viewport} / ${r.theme} \`${r.route}\`\n`;
+  }
+  md += `\n`;
+}
 
 for (const r of results) {
   if (!r.contrast.length && !r.overflow.length && !r.small.length && !r.error) {
@@ -363,7 +398,7 @@ for (const r of results) {
   }
 }
 
-if (contrastCount + overflowCount + smallCount === 0) {
+if (contrastCount + overflowCount + smallCount + unsettled.length === 0) {
   md += `No failures.\n`;
 }
 
@@ -372,6 +407,13 @@ writeFileSync(join(OUT, "ui-audit.md"), md);
 console.log(
   `\ncontrast ${contrastCount} · overflow ${overflowCount} · small targets ${smallCount}`,
 );
+
+if (unsettled.length) {
+  console.log(
+    `\n${unsettled.length} page(s) never finished loading, so nothing on them was really` +
+      `\nchecked. Stop next dev, delete .next, restart, and run again.`,
+  );
+}
 console.log(`Report: ${join(OUT, "ui-audit.md")}`);
 
-process.exit(contrastCount > 0 || overflowCount > 0 ? 1 : 0);
+process.exit(contrastCount > 0 || overflowCount > 0 || unsettled.length > 0 ? 1 : 0);

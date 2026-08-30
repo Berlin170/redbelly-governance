@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PageHead } from "@/components/page-head";
 import { ConnectWallet } from "@/components/connect-wallet";
 import { ProposalBody } from "@/components/proposal-body";
 import { useSpace } from "@/components/space-provider";
@@ -189,12 +190,10 @@ export default function CreatePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="display-wide text-2xl">New proposal</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Publishing signs a message. It costs no gas.
-        </p>
-      </div>
+      <PageHead title="New proposal">
+        Publishing signs a message. It costs no gas, and a proposal cannot be
+        edited once it is open — preview it first.
+      </PageHead>
 
       <Card>
         <CardContent className="space-y-5 p-6">

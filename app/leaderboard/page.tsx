@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { PageHead } from "@/components/page-head";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddressAvatar } from "@/components/address-avatar";
 import { useProfiles, displayName } from "@/lib/use-profiles";
@@ -99,14 +100,11 @@ export default function LeaderboardPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="display-wide text-2xl">Members</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Everyone who has voted or opened a proposal here, imported Snapshot
-          history included. <span className="tabular">{members?.length ?? 0}</span>{" "}
-          in all.
-        </p>
-      </div>
+      <PageHead title="Members">
+        Everyone who has voted or opened a proposal here, imported Snapshot
+        history included. <span className="tabular">{members?.length ?? 0}</span>{" "}
+        in all.
+      </PageHead>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative min-w-0 flex-1 sm:max-w-xs">
