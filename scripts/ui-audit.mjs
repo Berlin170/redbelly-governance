@@ -50,6 +50,46 @@ const ROUTES = [
   ["/safety", "safety"],
 ];
 
+/**
+ * The proposal page is the one that matters most and the one this gate could
+ * not see: every other route is a list or a form, while this is where people
+ * actually read the question and cast the ballot. It was left out because its
+ * path needs an id, and an id hardcoded here would rot the first time the row
+ * it names is deleted.
+ *
+ * So ask the running site for one instead. An open proposal and a closed one
+ * are different screens — the open one carries the ballot form, the closed one
+ * the results and the outcome badge — so audit one of each when both exist.
+ * Discovery failing is not a gate failure: it means the five static routes are
+ * checked and the report says the detail page was not.
+ */
+async function detailRoutes() {
+  try {
+    const res = await fetch(`${BASE}/api/proposals`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const body = await res.json();
+    const all = Array.isArray(body) ? body : (body.proposals ?? []);
+    const now = Date.now();
+
+    const open = all.find((p) => new Date(p.end_at).getTime() > now);
+    const closed = all.find((p) => new Date(p.end_at).getTime() <= now);
+
+    return [
+      open && [`/proposal/${open.id}`, "proposal-open"],
+      closed && [`/proposal/${closed.id}`, "proposal-closed"],
+    ].filter(Boolean);
+  } catch (e) {
+    process.stdout.write(
+      `could not reach ${BASE}/api/proposals to pick a proposal page: ${e}
+`,
+    );
+    return [];
+  }
+}
+
+ROUTES.push(...(await detailRoutes()));
+
 const VIEWPORTS = [
   [{ width: 1440, height: 900 }, "desktop"],
   [{ width: 390, height: 844 }, "mobile"],

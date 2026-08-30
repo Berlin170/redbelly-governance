@@ -36,7 +36,7 @@ function Voter({
       href={explorerAddress(vote.voter)}
       target="_blank"
       rel="noreferrer"
-      className={`inline-flex min-w-0 items-center gap-2 text-sm hover:text-primary ${className ?? ""}`}
+      className={`inline-flex min-w-0 items-center gap-2 py-0.5 text-sm hover:text-primary ${className ?? ""}`}
     >
       <AddressAvatar
         address={vote.voter}

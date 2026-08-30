@@ -53,7 +53,7 @@ export function HowVotingWorks({
         {trigger ?? (
           <button
             type="button"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="-my-1 py-1 underline underline-offset-2 hover:text-foreground"
           >
             How this works
           </button>

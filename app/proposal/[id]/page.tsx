@@ -116,7 +116,7 @@ export default function ProposalPage({
     <div className="space-y-5">
       <Link
         href="/proposals"
-        className="pressable inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+        className="pressable -mx-2 -my-1.5 inline-flex items-center rounded px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="mr-1.5 size-4" />
         Proposals
@@ -135,7 +135,7 @@ export default function ProposalPage({
               href={proposal.source_url}
               target="_blank"
               rel="noreferrer"
-              className="pressable inline-flex items-center rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              className="pressable inline-flex items-center rounded border border-border px-1.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
             >
               Imported from Snapshot
               <ExternalLink className="ml-1 size-2.5" />
@@ -154,7 +154,7 @@ export default function ProposalPage({
             href={explorerAddress(proposal.author)}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1.5 py-0.5 transition-colors hover:text-foreground"
             title={proposal.author}
           >
             <AddressAvatar
@@ -201,7 +201,7 @@ export default function ProposalPage({
             href={proposal.discussion}
             target="_blank"
             rel="noreferrer"
-            className="pressable inline-flex items-center text-sm text-primary hover:underline"
+            className="pressable -my-1 inline-flex items-center py-1 text-sm text-primary hover:underline"
           >
             <MessageSquare className="mr-1.5 size-3.5" />
             Discussion
