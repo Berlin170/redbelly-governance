@@ -35,14 +35,68 @@ export const dynamic = "force-dynamic";
 const LIST_CACHE = "public, s-maxage=30, stale-while-revalidate=60";
 
 export async function GET(req: NextRequest) {
-  const space = req.nextUrl.searchParams.get("space") ?? process.env.NEXT_PUBLIC_SPACE_ID!;
+  const params = req.nextUrl.searchParams;
+  const space = params.get("space") ?? process.env.NEXT_PUBLIC_SPACE_ID!;
   const db = supabaseAdmin();
 
-  const { data, error } = await db
+  /*
+    Filters, for callers that do not want the whole history.
+
+    The site itself always wants everything — it has filter chips of its own and
+    switching between them should not cost a round trip. A bot polling for
+    something to announce is the opposite case: it wants the few proposals it
+    has not seen, and the unfiltered list is now ~170 KB of which all but a
+    fraction is the 31 imported Snapshot proposals, re-sent every poll and
+    growing with every vote cast.
+
+      ?open=1              currently accepting ballots
+      ?since=<ISO 8601>    opened after that instant
+      ?source=native|snapshot
+
+    They narrow the database query rather than the response, so a filtered call
+    also skips loading and tallying the ballots it excluded. Each combination is
+    a distinct URL and so gets its own CDN entry, which is exactly right: a
+    poller hitting the same filter every minute is served from the edge.
+  */
+  const now = new Date().toISOString();
+  const source = params.get("source");
+
+  if (source && source !== "native" && source !== "snapshot") {
+    return NextResponse.json(
+      { error: "source must be 'native' or 'snapshot'." },
+      { status: 400 }
+    );
+  }
+
+  let since: string | null = null;
+  if (params.has("since")) {
+    const raw = params.get("since")!;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json(
+        { error: "since must be an ISO 8601 timestamp." },
+        { status: 400 }
+      );
+    }
+    since = parsed.toISOString();
+  }
+
+  let query = db
     .from("proposals")
     .select("*")
     .eq("space_id", space)
     .order("created_at", { ascending: false });
+
+  // Absent, "0" and "false" all mean "do not filter", so a bot that always
+  // sends the parameter can turn it off without dropping it from the URL.
+  const openParam = params.get("open");
+  if (openParam !== null && openParam !== "0" && openParam !== "false") {
+    query = query.lte("start_at", now).gt("end_at", now);
+  }
+  if (since) query = query.gt("created_at", since);
+  if (source) query = query.eq("source", source);
+
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
