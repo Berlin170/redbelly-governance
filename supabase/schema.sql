@@ -1,5 +1,13 @@
--- Redbelly Governance Portal — Supabase schema
--- Run this in the Supabase SQL editor.
+-- Redbelly Governance Portal — baseline schema
+--
+-- This is the starting point, NOT the current shape of the database. It
+-- creates the original tables; everything since is an ordered migration in
+-- ./migrations, and production is this file plus all of them. Reading it alone
+-- will tell you there are no source_* columns and no Copeland, both of which
+-- have been live since 2026-08-24.
+--
+-- To build the database from nothing: run this, then ./migrations in numeric
+-- order. See ./README.md for what is applied where.
 
 create extension if not exists "pgcrypto";
 

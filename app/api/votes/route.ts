@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
     if (error && isMissingColumn(error)) {
       console.warn(
         "[votes] source_receipt is missing — IPFS receipts are OFF until " +
-          "supabase/003_copeland.sql has been run."
+          "supabase/migrations/003_copeland.sql has been run."
       );
       delete row.source_receipt;
       ({ data, error } = await db

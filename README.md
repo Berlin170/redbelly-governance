@@ -57,9 +57,9 @@ npm install
 Create a Supabase project, open the SQL editor, and run `supabase/schema.sql`.
 It creates the tables, row level security policies, and seeds the space.
 
-Then run everything in `supabase/migrations/` in filename order, and
-`supabase/003_copeland.sql` — each one is written to be safe to run twice, and
-each explains at the top what it is for and why. They are not optional: the
+Then run everything in `supabase/migrations/` in filename order — each one is
+written to be safe to run twice, and each explains at the top what it is for and
+why. `supabase/README.md` lists them with what each adds. They are not optional: the
 portal degrades quietly without them rather than failing loudly, so a missing
 migration shows up as a feature that seems switched off. `006_replay_protection`
 is the one to run first on an existing deployment, because until it does every

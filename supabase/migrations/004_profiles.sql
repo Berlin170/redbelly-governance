@@ -1,9 +1,5 @@
 -- Member profiles. Run this once in the Supabase SQL editor.
 --
--- Numbered 004 rather than 003 because supabase/003_copeland.sql already
--- claims that number outside this folder. Until the two directories are
--- merged, numbers are unique across both.
---
 -- A profile is signed like a vote or a follow. An unsigned name column would
 -- let anyone with API access relabel any address, and in a governance tool the
 -- name beside a proposal is not decoration — it is the thing readers trust.

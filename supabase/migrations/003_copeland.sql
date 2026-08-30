@@ -1,5 +1,5 @@
 -- Migration 003 — Copeland voting, and verifiable provenance for imports
--- Run this in the Supabase SQL editor after 002_snapshot_import.sql.
+-- Run this in the Supabase SQL editor after 002_follow_sources.sql.
 
 -- ------------------------------------------------------- copeland voting
 -- Copeland is now tallied natively (lib/voting.ts), so it stops being folded

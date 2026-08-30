@@ -1,5 +1,11 @@
--- Migration 002 — Snapshot import + richer space metadata
+-- Migration 000 — Snapshot import + richer space metadata
 -- Run this in the Supabase SQL editor after schema.sql.
+--
+-- Numbered 000, not 002. It was written as "002" while it lived in supabase/
+-- rather than supabase/migrations/, which already had a different 002 — so the
+-- one number named two migrations and 003_copeland.sql was missed for a day
+-- because of it. This is the earliest change on top of the baseline, so it
+-- takes the number below the series instead of pushing every later file up.
 
 -- ---------------------------------------------------------------- spaces
 -- Space header needs a banner, links and follower count to look like a real
