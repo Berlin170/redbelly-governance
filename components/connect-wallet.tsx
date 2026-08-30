@@ -11,12 +11,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { AddressAvatar } from "@/components/address-avatar";
 import { ProfileSheet } from "@/components/profile-sheet";
 import { useProfile } from "@/lib/use-profiles";
 import { shortAddress } from "@/lib/utils";
 import { activeChain } from "@/lib/chains";
-import { LogOut, Wallet, AlertTriangle, UserRound } from "lucide-react";
+import {
+  LogOut,
+  Wallet,
+  AlertTriangle,
+  UserRound,
+  ChevronRight,
+} from "lucide-react";
 
 type WalletOption = {
   connector: Connector;
@@ -83,6 +97,7 @@ export function ConnectWallet() {
   const { switchChain } = useSwitchChain();
   const { data: profile } = useProfile(address);
   const [editing, setEditing] = useState(false);
+  const [picking, setPicking] = useState(false);
   const hasInjected = useHasInjectedProvider();
 
   const options = useMemo<WalletOption[]>(() => {
@@ -131,35 +146,65 @@ export function ConnectWallet() {
       );
     }
 
+    /*
+      Picking a wallet is a decision, not a menu command.
+
+      As a dropdown the choices arrived as a strip of 32px rows with the wallet
+      icons shrunk to 16px — the one screen where a visitor is deciding whether
+      to trust this site at all, rendered as an afterthought. A dialog gives
+      each wallet a real target, and room for the one sentence that answers
+      what connecting actually does.
+    */
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <Dialog open={picking} onOpenChange={setPicking}>
+        <DialogTrigger asChild>
           <Button disabled={isPending} size="sm">
             <Wallet className="mr-2 size-4" />
             {isPending ? "Connecting" : "Connect wallet"}
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {options.map((option) => (
-            <DropdownMenuItem
-              key={option.connector.uid}
-              onClick={() => connect({ connector: option.connector })}
-            >
-              {option.icon ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={option.icon}
-                  alt=""
-                  className="mr-2 size-4 rounded-sm"
-                />
-              ) : (
-                <Wallet className="mr-2 size-4" />
-              )}
-              {option.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </DialogTrigger>
+
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Connect a wallet</DialogTitle>
+            <DialogDescription>
+              Connecting only reads your address. It gives this site no
+              permission to move anything you hold.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            {options.map((option) => (
+              <button
+                key={option.connector.uid}
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  setPicking(false);
+                  connect({ connector: option.connector });
+                }}
+                className="pressable flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left text-sm font-medium hover:border-primary/45 hover:bg-accent/40 disabled:opacity-60"
+              >
+                {option.icon ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={option.icon} alt="" className="size-7 rounded-md" />
+                ) : (
+                  <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border">
+                    <Wallet className="size-4 text-muted-foreground" />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            On a phone, browser wallets only exist inside a wallet app&rsquo;s
+            own browser. WalletConnect reaches the app from anywhere.
+          </p>
+        </DialogContent>
+      </Dialog>
     );
   }
 

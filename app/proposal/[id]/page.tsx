@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, MessageSquare, ShieldCheck } from "lucide-react";
@@ -14,6 +14,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   proposalState,
   shortAddress,
   receiptUrl,
@@ -21,6 +26,7 @@ import {
   timeLeft,
 } from "@/lib/utils";
 import { explorerAddress } from "@/lib/chains";
+import { outcomeOf } from "@/lib/outcome";
 import { useProfile, displayName } from "@/lib/use-profiles";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import type { Proposal, TallyResult, Vote } from "@/lib/types";
@@ -65,6 +71,22 @@ export default function ProposalPage({
   // skeleton below, and a hook that runs only sometimes is not a hook.
   const { data: authorProfile } = useProfile(data?.proposal.author);
 
+  const state = data
+    ? proposalState(data.proposal.start_at, data.proposal.end_at)
+    : "pending";
+
+  // The verdict, computed the same way the proposal list computes it. It was
+  // missing here entirely: the list badged a finished vote "Rejected" and this
+  // page said only "Closed", so the two screens disagreed about the one thing
+  // a reader came to find out.
+  const outcome = useMemo(
+    () =>
+      data && state === "closed"
+        ? outcomeOf(data.proposal, data.results)
+        : undefined,
+    [data, state],
+  );
+
   if (error) {
     return (
       <div className="rounded-xl border border-destructive/40 bg-card p-6 text-sm">
@@ -88,103 +110,117 @@ export default function ProposalPage({
   }
 
   const { proposal, votes, results } = data;
-  const state = proposalState(proposal.start_at, proposal.end_at);
   const system = VOTING_SYSTEMS.find((s) => s.value === proposal.voting_system);
 
   return (
     <div className="space-y-5">
       <Link
         href="/proposals"
-        className="inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="pressable inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="mr-1.5 size-4" />
         Proposals
       </Link>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px] lg:items-start">
-        <div className="min-w-0 space-y-5">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge state={state} />
-              {state === "active" && (
-                <span className="text-xs text-muted-foreground">
-                  {timeLeft(proposal.end_at)}
-                </span>
-              )}
-              {proposal.source === "snapshot" && proposal.source_url && (
-                <a
-                  href={proposal.source_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Imported from Snapshot
-                  <ExternalLink className="ml-1 size-2.5" />
-                </a>
-              )}
-            </div>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge state={state} outcome={outcome} />
+          {state === "active" && (
+            <span className="text-xs text-muted-foreground">
+              {timeLeft(proposal.end_at)}
+            </span>
+          )}
+          {proposal.source === "snapshot" && proposal.source_url && (
+            <a
+              href={proposal.source_url}
+              target="_blank"
+              rel="noreferrer"
+              className="pressable inline-flex items-center rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
+            >
+              Imported from Snapshot
+              <ExternalLink className="ml-1 size-2.5" />
+            </a>
+          )}
+        </div>
 
-            <h1 className="text-2xl font-semibold leading-tight tracking-tight">
-              {proposal.title}
-            </h1>
+        <h1 className="display-wide text-2xl leading-tight sm:text-[1.75rem]">
+          {proposal.title}
+        </h1>
 
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-              <span className="tabular">{shortProposalId(proposal)}</span>
-              <span>by</span>
-              <a
-                href={explorerAddress(proposal.author)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
-                title={proposal.author}
-              >
-                <AddressAvatar
-                  address={proposal.author}
-                  src={authorProfile?.avatar_url}
-                  size={16}
-                />
-                <span className={authorProfile?.display_name ? undefined : "tabular"}>
-                  {displayName(authorProfile, shortAddress(proposal.author))}
-                </span>
-              </a>
-              {/* A name is a label on an address, so the address stays on the
-                  line beside it rather than being replaced by it. */}
-              {authorProfile?.display_name && (
-                <span className="tabular text-xs">
-                  {shortAddress(proposal.author)}
-                </span>
-              )}
-              <span className="text-border">·</span>
-              <span>{system?.label}</span>
-              {proposal.require_verified && (
-                <>
-                  <span className="text-border">·</span>
-                  {/* A term of the vote, so it belongs where the terms are read,
-                      not only in the error someone gets after signing. */}
-                  <span
-                    className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs"
-                    title="Only wallets holding a Receptor credential can vote on this proposal."
-                  >
-                    <ShieldCheck className="size-3" />
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <span className="tabular">{shortProposalId(proposal)}</span>
+          <span>by</span>
+          <a
+            href={explorerAddress(proposal.author)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+            title={proposal.author}
+          >
+            <AddressAvatar
+              address={proposal.author}
+              src={authorProfile?.avatar_url}
+              size={16}
+            />
+            <span className={authorProfile?.display_name ? undefined : "tabular"}>
+              {displayName(authorProfile, shortAddress(proposal.author))}
+            </span>
+          </a>
+          {/* A name is a label on an address, so the address stays on the
+              line beside it rather than being replaced by it. */}
+          {authorProfile?.display_name && (
+            <span className="tabular text-xs">
+              {shortAddress(proposal.author)}
+            </span>
+          )}
+          <span aria-hidden className="text-muted-foreground/45">·</span>
+          <span>{system?.label}</span>
+          {proposal.require_verified && (
+            <>
+              <span aria-hidden className="text-muted-foreground/45">·</span>
+              {/* A term of the vote, so it belongs where the terms are read,
+                  not only in the error someone gets after signing. */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex cursor-help items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs">
+                    <ShieldCheck className="size-3 text-primary" />
                     Verified wallets only
                   </span>
-                </>
-              )}
-            </p>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  Only wallets holding a Receptor credential can vote on this
+                  proposal.
+                </TooltipContent>
+              </Tooltip>
+            </>
+          )}
+        </p>
 
-            {proposal.discussion && (
-              <a
-                href={proposal.discussion}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center text-sm text-primary hover:underline"
-              >
-                <MessageSquare className="mr-1.5 size-3.5" />
-                Discussion
-              </a>
-            )}
-          </div>
+        {proposal.discussion && (
+          <a
+            href={proposal.discussion}
+            target="_blank"
+            rel="noreferrer"
+            className="pressable inline-flex items-center text-sm text-primary hover:underline"
+          >
+            <MessageSquare className="mr-1.5 size-3.5" />
+            Discussion
+          </a>
+        )}
+      </div>
 
+      {/*
+        On a phone the rail comes first.
+
+        The old order put the whole proposal body — sometimes thousands of
+        pixels of imported markdown — and then the full ballot list above the
+        one control the visitor came here to use. Ordering is a presentation
+        concern, so it is done with `order` rather than by duplicating the
+        panels or moving them in the DOM, and the reading order on desktop is
+        unchanged.
+      */}
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+        <div className="order-2 min-w-0 space-y-5 lg:order-1">
           {proposal.body && (
             <Card>
               <CardContent className="p-5">
@@ -268,7 +304,7 @@ export default function ProposalPage({
           </Tabs>
         </div>
 
-        <div className="space-y-4 lg:sticky lg:top-20">
+        <div className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-20">
           {state === "active" && (
             <VotePanel proposal={proposal} votes={votes} onVoted={onVoted} />
           )}
@@ -276,6 +312,8 @@ export default function ProposalPage({
             results={results}
             choices={proposal.choices}
             quorum={Number(proposal.quorum)}
+            state={state}
+            outcome={outcome}
           />
         </div>
       </div>
@@ -287,7 +325,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="tabular text-right">{value}</span>
+      <span className="tabular break-words text-right">{value}</span>
     </div>
   );
 }

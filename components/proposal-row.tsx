@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { MinusCircle, ArrowDownToLine, Check } from "lucide-react";
+import { ArrowDownToLine, Check } from "lucide-react";
 import { AddressAvatar } from "@/components/address-avatar";
+import { EmptyArt } from "@/components/art/lattice";
 import { StatusBadge } from "@/components/status-badge";
 import { choiceLabelShares, choiceShares } from "@/lib/results";
 import { outcomeOf } from "@/lib/outcome";
@@ -125,11 +126,14 @@ export function ProposalRow({
   item,
   profile,
   voted,
+  index = 0,
 }: {
   item: ProposalListItem;
   profile?: Profile;
   /** True when the connected wallet has a ballot on this proposal. */
   voted?: boolean;
+  /** Position in the list, which drives the entrance stagger. */
+  index?: number;
 }) {
   const state = proposalState(item.start_at, item.end_at);
   const outcome = state === "closed" ? outcomeOf(item, item.results) : undefined;
@@ -137,16 +141,17 @@ export function ProposalRow({
   return (
     <Link
       href={`/proposal/${item.id}`}
+      style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
       className="group relative block border-b border-border px-4 py-4 transition-colors last:border-b-0 hover:bg-accent/30 sm:px-5"
     >
       {/* Brand rail on hover — cheaper than a shadow and it survives the
           rounded container clipping the row's own borders. */}
-      <span className="absolute inset-y-0 left-0 w-0.5 scale-y-0 bg-primary transition-transform duration-200 group-hover:scale-y-100" />
+      <span className="rail absolute inset-y-0 left-0 w-[3px] bg-primary" />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="min-w-0 font-medium leading-snug tracking-tight transition-colors group-hover:text-primary">
+            <h3 className="display min-w-0 text-[0.9375rem] leading-snug transition-colors group-hover:text-primary">
               {item.title}
             </h3>
             <StatusBadge state={state} outcome={outcome} />
@@ -169,7 +174,7 @@ export function ProposalRow({
               </span>
             </span>
 
-            <span className="text-border">·</span>
+            <span aria-hidden className="text-muted-foreground/45">·</span>
             <span className="tabular">
               {state === "closed"
                 ? timeAgo(item.end_at)
@@ -187,7 +192,7 @@ export function ProposalRow({
                 className="inline-flex items-center gap-1"
                 title="You have voted on this proposal"
               >
-                <span className="text-border">·</span>
+                <span aria-hidden className="text-muted-foreground/45">·</span>
                 <Check className="size-3 text-status-active" />
                 voted
               </span>
@@ -200,7 +205,7 @@ export function ProposalRow({
                 className="inline-flex items-center gap-1 text-muted-foreground/60"
                 title="Imported from the DAO's Snapshot space — not signed on this portal"
               >
-                <span className="text-border">·</span>
+                <span aria-hidden className="text-muted-foreground/45">·</span>
                 <ArrowDownToLine className="size-3" />
                 imported
               </span>
@@ -214,12 +219,18 @@ export function ProposalRow({
   );
 }
 
-/** Empty-state box used by both the overview and the proposals list. */
+/**
+ * Empty-state box used by both the overview and the proposals list.
+ *
+ * An empty list is a moment the interface is being looked at closely, which is
+ * the worst possible moment to show a grey icon and a shrug. The scene is
+ * drawn, so it themes with everything else.
+ */
 export function EmptyRows({ message }: { message: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 px-5 py-16 text-sm text-muted-foreground">
-      <MinusCircle className="size-4" />
-      {message}
+    <div className="flex flex-col items-center justify-center gap-3 px-5 py-14 text-center">
+      <EmptyArt className="h-20 w-32" />
+      <p className="text-sm text-muted-foreground">{message}</p>
     </div>
   );
 }

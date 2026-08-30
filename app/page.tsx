@@ -25,8 +25,8 @@ function SectionHead({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mb-2.5 flex items-center justify-between gap-4 px-1">
-      <h2 className="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <div className="mb-3 flex items-center justify-between gap-4 px-1">
+      <h2 className="eyebrow flex items-baseline gap-2 text-muted-foreground">
         {title}
         {count != null && count > 0 && (
           <span className="tabular text-foreground">{count}</span>
@@ -56,7 +56,7 @@ export default function OverviewPage() {
     .slice(0, PREVIEW_COUNT);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <SpaceHeader />
       <StatStrip />
 
@@ -70,7 +70,7 @@ export default function OverviewPage() {
       {isLoading && (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
           ))}
         </div>
       )}
@@ -90,11 +90,12 @@ export default function OverviewPage() {
                 </Button>
               </SectionHead>
 
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
-                {active.map((p) => (
+              <div className="stagger overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+                {active.map((p, i) => (
                   <ProposalRow
                     key={p.id}
                     item={p}
+                    index={i}
                     profile={profiles?.[p.author.toLowerCase()]}
                     voted={mine?.has(p.id)}
                   />
@@ -116,26 +117,29 @@ export default function OverviewPage() {
                 )}
                 <Link
                   href="/proposals"
-                  className="inline-flex items-center rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  className="pressable group inline-flex items-center rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                   View all
-                  <ArrowRight className="ml-1 size-3" />
+                  <ArrowRight className="ml-1 size-3 transition-transform duration-200 group-hover:translate-x-0.5" />
                 </Link>
               </div>
             </SectionHead>
 
-            <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
               {recent.length === 0 && active.length === 0 ? (
                 <EmptyRows message="No proposals yet." />
               ) : recent.length === 0 ? (
                 <EmptyRows message="No past proposals yet." />
               ) : (
-                recent.map((p) => <ProposalRow
+                recent.map((p, i) => (
+                  <ProposalRow
                     key={p.id}
                     item={p}
+                    index={i}
                     profile={profiles?.[p.author.toLowerCase()]}
                     voted={mine?.has(p.id)}
-                  />)
+                  />
+                ))
               )}
             </div>
           </section>

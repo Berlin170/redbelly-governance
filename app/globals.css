@@ -4,47 +4,66 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Redbelly governance portal.
-  Primary red sampled from the Redbelly logo: #F44E4F
-  :root is the light theme, .dark the dark one. The red is darkened for light
-  surfaces — #f44e4f carries white text at about 3.4:1, which fails, while
-  #d93a3b clears 4.5:1 and still reads as the same brand red.
+  Redbelly governance portal — the "Ember" system.
+
+  Primary red sampled from the Redbelly logo: #F44E4F. It is darkened on light
+  surfaces because #f44e4f carries white text at about 3.4:1, which fails,
+  while #ce332e clears 4.9:1 and still reads as the same brand red.
+
+  The neutrals are not grey. Every one of them is pulled a few degrees toward
+  the red, so the palette reads as one family rather than a red accent bolted
+  onto a stock grey theme. The shift is small enough that nothing looks tinted
+  and large enough that the red stops looking like a guest.
+
+  :root is the light theme, .dark the dark one.
 */
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  --background: #fbfbfc;
-  --foreground: #16181a;
+  /* next/font self-hosts Archivo under a generated family name and exposes it
+     as --font-archivo on <html>. The literal string "Archivo" would not match
+     it, so the stack is assembled here once and read by everything below. */
+  --font-display-stack: var(--font-archivo), "Geist", ui-sans-serif, sans-serif;
+
+  --background: #fbfafa;
+  --foreground: #171314;
 
   --card: #ffffff;
-  --card-foreground: #16181a;
+  --card-foreground: #171314;
+
+  /* One step above the card, for panels that need to sit on top of one. */
+  --raised: #ffffff;
+  --raised-foreground: #171314;
 
   --popover: #ffffff;
-  --popover-foreground: #16181a;
+  --popover-foreground: #171314;
 
-  --primary: #d93a3b;
+  --primary: #ce332e;
   --primary-foreground: #ffffff;
+  --primary-rgb: 206 51 46;
 
-  --secondary: #f1f2f4;
-  --secondary-foreground: #16181a;
+  --secondary: #f2efef;
+  --secondary-foreground: #171314;
 
-  --muted: #f4f5f6;
-  --muted-foreground: #5f646b;
+  --muted: #f4f1f1;
+  --muted-foreground: #5e5859;
 
-  --accent: #eceef0;
-  --accent-foreground: #16181a;
+  --accent: #ebe7e7;
+  --accent-foreground: #171314;
 
   --destructive: #b4342f;
   --destructive-foreground: #ffffff;
 
-  --border: #e3e5e8;
-  --input: #d8dbdf;
-  --ring: #d93a3b;
+  --border: #e6e2e2;
+  /* For edges that have to survive on a white card rather than merely divide. */
+  --border-strong: #d3cdcd;
+  --input: #d8d3d3;
+  --ring: #ce332e;
 
   /* Same categorical set as the dark theme, darkened for a white card so the
      series keeps its identity across themes without losing contrast. */
-  --chart-1: #d93a3b;
+  --chart-1: #ce332e;
   --chart-2: #2f6fb8;
   --chart-3: #8a6114;
   --chart-4: #2a7a58;
@@ -56,55 +75,94 @@
   --status-passed: #1f7a55;
   --status-rejected: #b4342f;
 
-  --sidebar: #f6f7f8;
-  --sidebar-foreground: #16181a;
-  --sidebar-primary: #d93a3b;
+  --sidebar: #f6f4f4;
+  --sidebar-foreground: #171314;
+  --sidebar-primary: #ce332e;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e9ebee;
-  --sidebar-accent-foreground: #16181a;
-  --sidebar-border: #e3e5e8;
-  --sidebar-ring: #d93a3b;
+  --sidebar-accent: #e9e5e5;
+  --sidebar-accent-foreground: #171314;
+  --sidebar-border: #e6e2e2;
+  --sidebar-ring: #ce332e;
+
+  /* Art surfaces. The drawn banner and section backdrops read these so one
+     set of values themes every illustration on the site. */
+  --art-ink: #efeaea;
+  --art-line: rgb(206 51 46 / 0.16);
+  --art-line-soft: rgb(23 19 20 / 0.07);
+  --art-node: rgb(206 51 46 / 0.55);
+  --art-bloom: rgb(206 51 46 / 0.13);
+  --art-veil: rgb(255 255 255 / 0.55);
+
+  --shadow-card: 0 1px 2px rgb(23 19 20 / 0.04), 0 1px 3px rgb(23 19 20 / 0.06);
+  --shadow-raised: 0 2px 4px rgb(23 19 20 / 0.04), 0 8px 24px rgb(23 19 20 / 0.08);
+  --shadow-overlay: 0 12px 48px rgb(23 19 20 / 0.18);
 }
 
 .dark {
-  --background: #0b0c0d;
-  --foreground: #ededee;
-  --card: #141517;
-  --card-foreground: #ededee;
-  --popover: #17181b;
-  --popover-foreground: #ededee;
+  --background: #0b0a0b;
+  --foreground: #edecec;
+
+  --card: #151314;
+  --card-foreground: #edecec;
+
+  --raised: #1c191a;
+  --raised-foreground: #edecec;
+
+  --popover: #1f1c1d;
+  --popover-foreground: #edecec;
+
   --primary: #f44e4f;
-  --primary-foreground: #0b0c0d;
-  --secondary: #1e2023;
-  --secondary-foreground: #ededee;
-  --muted: #1a1c1f;
-  --muted-foreground: #8b8f95;
-  --accent: #26282b;
-  --accent-foreground: #ededee;
-  --destructive: #b4342f;
-  --destructive-foreground: #f5f5f5;
-  --border: #26282b;
-  --input: #2c2e32;
+  --primary-foreground: #0b0a0b;
+  --primary-rgb: 244 78 79;
+
+  --secondary: #1e1b1c;
+  --secondary-foreground: #edecec;
+
+  --muted: #171516;
+  --muted-foreground: #9a9495;
+
+  --accent: #262223;
+  --accent-foreground: #edecec;
+
+  --destructive: #e5564f;
+  --destructive-foreground: #0b0a0b;
+
+  --border: #2a2627;
+  --border-strong: #3a3536;
+  --input: #322d2e;
   --ring: #f44e4f;
+
   --chart-1: #f44e4f;
   --chart-2: #4a90d9;
-  --chart-3: #b07d20;
+  --chart-3: #c08c2a;
   --chart-4: #38966e;
   --chart-5: #9b7ad9;
-  --sidebar: #0e0f11;
-  --sidebar-foreground: #ededee;
-  --sidebar-primary: #f44e4f;
-  --sidebar-primary-foreground: #0b0c0d;
-  --sidebar-accent: #1e2023;
-  --sidebar-accent-foreground: #ededee;
-  --sidebar-border: #212326;
-  --sidebar-ring: #f44e4f;
 
   --status-active: #55b78a;
   --status-pending: #d9a441;
-  --status-closed: #6b7076;
+  --status-closed: #8b8f95;
   --status-passed: #55b78a;
-  --status-rejected: #b4342f;
+  --status-rejected: #e8736d;
+
+  --sidebar: #0e0c0d;
+  --sidebar-foreground: #edecec;
+  --sidebar-primary: #f44e4f;
+  --sidebar-primary-foreground: #0b0a0b;
+  --sidebar-accent: #1e1b1c;
+  --sidebar-accent-foreground: #edecec;
+  --sidebar-border: #221f20;
+  --sidebar-ring: #f44e4f;
+
+  --art-ink: #0b0a0b;
+  --art-line: rgb(244 78 79 / 0.22);
+  --art-line-soft: rgb(237 236 236 / 0.06);
+  --art-node: rgb(244 78 79 / 0.85);
+  --art-bloom: rgb(244 78 79 / 0.22);
+  --art-veil: rgb(11 10 11 / 0.55);
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-overlay: 0 12px 48px rgb(0 0 0 / 0.6);
 }
 
 @theme inline {
@@ -113,16 +171,20 @@
      nothing here and the font silently falls back. */
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --font-display: var(--font-archivo), "Geist", ui-sans-serif, sans-serif;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-raised: var(--raised);
+  --color-raised-foreground: var(--raised-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
@@ -136,6 +198,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
@@ -159,6 +222,53 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+
+  /* The built-in CSS easings are too weak to read as deliberate. These are the
+     stronger variants: ease-out for anything entering, ease-in-out for
+     movement across the screen. ease-in is deliberately absent — it delays the
+     first frame, which is the one the eye is actually watching. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-rise: rise 380ms var(--ease-out) both;
+  --animate-bloom: bloom 700ms var(--ease-out) both;
+  --animate-sweep: sweep 2.6s linear infinite;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bloom {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
 }
 
 @layer base {
@@ -168,11 +278,36 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  body {
-    font-family: var(--font-sans);
+  /* Display face. Archivo carries a width axis, which is what gives a heading
+     presence no static face can — but the wide setting only works at size, so
+     it is opted into rather than applied to every heading. */
+  .display {
+    font-family: var(--font-display-stack);
+    font-weight: 700;
+    letter-spacing: -0.021em;
+  }
+
+  .display-wide {
+    font-family: var(--font-display-stack);
+    font-weight: 700;
+    font-stretch: 112%;
+    letter-spacing: -0.028em;
+  }
+
+  /* Section labels: small, wide, quiet. The width axis does the work that a
+     heavier weight would otherwise have to do at this size. */
+  .eyebrow {
+    font-family: var(--font-display-stack);
+    font-weight: 600;
+    font-stretch: 108%;
+    font-size: 0.6875rem;
+    line-height: 1;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
   }
 
   /* Addresses, balances and vote counts: mono keeps digits and hex aligned
@@ -181,5 +316,102 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
+  }
+
+  /* Figures large enough to be read as a headline rather than a value. */
+  .figure {
+    font-family: var(--font-display-stack);
+    font-weight: 700;
+    font-stretch: 105%;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+}
+
+@layer components {
+  /*
+    Press feedback. Every pressable element scales down a touch on :active, so
+    the interface visibly hears the click. Hover is gated behind a real pointer
+    — a touch device fires hover on tap and would otherwise show a hover state
+    the finger is already covering.
+  */
+  .pressable {
+    transition:
+      transform 140ms var(--ease-out),
+      background-color 160ms var(--ease-out),
+      border-color 160ms var(--ease-out),
+      color 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out);
+  }
+
+  .pressable:active {
+    transform: scale(0.97);
+  }
+
+  /* A hairline of brand along an edge, used by rows and active nav items.
+     Transform-scaled rather than width-animated so it stays off the main
+     thread and survives a rounded parent clipping its borders. */
+  .rail {
+    transform: scaleY(0);
+    transform-origin: center;
+    transition: transform 220ms var(--ease-out);
+  }
+
+  .group:hover .rail,
+  .rail[data-on="true"] {
+    transform: scaleY(1);
+  }
+
+  /* Skeletons sweep rather than pulse. A pulse reads as a thing blinking; a
+     sweep reads as a thing loading. */
+  .sweep {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--primary-rgb) / 0.07),
+      transparent
+    );
+    animation: var(--animate-sweep);
+  }
+}
+
+@layer utilities {
+  /* Staggered entrance for lists. Short delays only — long ones make the whole
+     page feel slow, and the stagger is decoration that must never gate input. */
+  .stagger > * {
+    animation: var(--animate-rise);
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+}
+
+/*
+  Reduced motion means fewer and gentler animations, not none: opacity and
+  colour still carry meaning, so they stay. Everything that moves stops.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .pressable:active {
+    transform: none;
+  }
+
+  .stagger > * {
+    animation: none;
+    opacity: 1;
   }
 }

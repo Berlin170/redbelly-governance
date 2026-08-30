@@ -20,8 +20,30 @@ const absentOptionalDeps = [
   "pino-pretty",
 ];
 
+/**
+ * Working on the interface needs real proposals on screen, but the API routes
+ * read Supabase with a service key nobody should be handing out to borrow a
+ * layout. Setting NEXT_PUBLIC_API_PROXY to a deployment sends `/api/*` there
+ * instead, so `next dev` renders live data with no credentials on the machine.
+ * Unset — which is how it is deployed — this returns nothing and the app
+ * serves its own routes exactly as before.
+ */
+const apiProxy = process.env.NEXT_PUBLIC_API_PROXY;
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  async rewrites() {
+    if (!apiProxy) return { beforeFiles: [], afterFiles: [], fallback: [] };
+    // beforeFiles, not the default: the local route files exist and would
+    // otherwise win the match and then fail for want of a database.
+    return {
+      beforeFiles: [
+        { source: "/api/:path*", destination: `${apiProxy}/api/:path*` },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   webpack(config) {
     config.resolve.alias = {
       ...config.resolve.alias,
