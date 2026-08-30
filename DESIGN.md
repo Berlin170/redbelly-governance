@@ -121,8 +121,13 @@ from their trigger, but a modal is not anchored to one.
 ## The frontend gate
 
 ```bash
+npm i -D playwright && npx playwright install chromium   # once
 node scripts/ui-audit.mjs [baseUrl] [outDir]
 ```
+
+Playwright is not a dependency of the app — the gate is tooling, not something
+the portal ships. If you already have it installed elsewhere, point
+`PLAYWRIGHT_RESOLVE_FROM` at the `package.json` beside that install instead.
 
 Runs every route across both themes and both a desktop and a phone width — 20
 combinations — and checks:

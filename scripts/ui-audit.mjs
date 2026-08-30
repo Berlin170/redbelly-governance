@@ -19,10 +19,25 @@ import { createRequire } from "node:module";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
+// Playwright is deliberately not a dependency of the app: it is a gate, not
+// something the portal ships. Resolve it from wherever this checkout can see
+// it, and let PLAYWRIGHT_RESOLVE_FROM borrow an install that lives elsewhere.
 const require = createRequire(
-  "file:///D:/claudesidia-vault/07_Development/tools/package.json",
+  process.env.PLAYWRIGHT_RESOLVE_FROM ?? import.meta.url,
 );
-const { chromium } = require("playwright");
+
+let chromium;
+try {
+  ({ chromium } = require("playwright"));
+} catch {
+  console.error(
+    "The UI gate needs Playwright, which the app does not depend on:\n" +
+      "  npm i -D playwright && npx playwright install chromium\n" +
+      "Or point PLAYWRIGHT_RESOLVE_FROM at a package.json next to an install\n" +
+      "you already have.",
+  );
+  process.exit(1);
+}
 
 const BASE = process.argv[2] ?? "http://localhost:3000";
 const OUT = process.argv[3] ?? ".";
