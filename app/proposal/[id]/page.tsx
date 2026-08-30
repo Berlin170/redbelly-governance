@@ -9,6 +9,7 @@ import { ResultsPanel } from "@/components/results-panel";
 import { VotersTable } from "@/components/voters-table";
 import { ProposalBody } from "@/components/proposal-body";
 import { StatusBadge } from "@/components/status-badge";
+import { ShareButton } from "@/components/share-button";
 import { AddressAvatar } from "@/components/address-avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -141,6 +142,11 @@ export default function ProposalPage({
               <ExternalLink className="ml-1 size-2.5" />
             </a>
           )}
+          {/* Pushed to the far end of the row it shares with the state: the
+              state is what the reader came for, and the share is what they do
+              after reading it. On a phone the row wraps and it lands on its
+              own line, which is where a thumb expects it anyway. */}
+          <ShareButton title={proposal.title} />
         </div>
 
         <h1 className="display-wide text-2xl leading-tight sm:text-[1.75rem]">
