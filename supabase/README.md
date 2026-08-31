@@ -21,10 +21,27 @@ Run `schema.sql` first, then `migrations/` in numeric order.
 | `migrations/006_replay_protection.sql` | unique signatures, `signed_at` on votes | yes |
 | `migrations/007_avatar_uploads.sql` | the `avatars` storage bucket | yes |
 | `migrations/008_ipfs_receipts.sql` | `signed_at` on proposals, receipt columns | yes |
+| `migrations/009_avatar_uploads_rls.sql` | RLS on `avatar_uploads`, no policy | **not yet** |
 
-All of the above are live in production, verified 2026-08-30 by reading rows
+000 through 008 are live in production, verified 2026-08-30 by reading rows
 that only exist if the migration ran — every native proposal carries both a
 `source_receipt` CID and a `signed_at`, which are 008's columns.
+
+**009 is written and not yet applied.** It is the one outstanding schema change:
+`avatar_uploads` is the only table Supabase's default RLS behaviour still
+applies to, meaning the public anon role could read and write it through
+PostgREST. Nothing reaches it today — the anon key and project URL appear in no
+built client file — so this is closing the gap before something opens it. The
+app is unaffected either way, because `/api/avatar` uses the service role, which
+bypasses RLS. Paste it into the SQL editor when convenient; there is no rush and
+no downtime.
+
+To confirm it took, from the SQL editor:
+
+```sql
+select relrowsecurity from pg_class where relname = 'avatar_uploads';
+-- t  once 009 has run
+```
 
 ## Why 000 is numbered below 001
 
@@ -40,7 +57,7 @@ reference to them by number.
 
 ## Adding one
 
-Next number is `009`. Put it in `migrations/`, make it idempotent
+Next number is `010`. Put it in `migrations/`, make it idempotent
 (`add column if not exists`, `create table if not exists`) so a re-run is
 harmless, and make the code tolerate its absence until it is applied —
 `isMissingColumn` in `lib/pg-errors.ts` is how the proposal route degrades to
