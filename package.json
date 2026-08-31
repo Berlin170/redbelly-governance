@@ -9,7 +9,7 @@
     "lint": "eslint . --max-warnings=0",
     "import:snapshot": "node scripts/import-snapshot.mjs",
     "rebuild:ipfs": "node scripts/rebuild-from-ipfs.mjs",
-    "test": "tsx scripts/voting.test.ts && tsx scripts/profile-fields.test.ts && tsx scripts/pg-errors.test.ts && tsx scripts/receipts.test.ts"
+    "test": "tsx scripts/voting.test.ts && tsx scripts/outcome.test.ts && tsx scripts/profile-fields.test.ts && tsx scripts/pg-errors.test.ts && tsx scripts/receipts.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.6",
