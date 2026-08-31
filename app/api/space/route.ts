@@ -4,6 +4,28 @@ import type { Space } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * How long the CDN may serve the space header without asking us again.
+ *
+ * This is the busiest read in the portal: the header and the sidebar counts
+ * are on every page, so every visitor to every route pays for it. Building it
+ * costs four sequential round trips — the space, its proposals, a count of
+ * native ballots, then every voter address to size a set — about a second of
+ * server time, repeated per visitor, to render numbers that move when somebody
+ * votes.
+ *
+ * Sixty seconds is the client's own number, not a new judgement:
+ * `space-provider` has always set `staleTime: 60_000`, having decided a
+ * minute-old count was current enough to render. This makes the CDN agree with
+ * it rather than rebuilding a total from scratch behind a client that was not
+ * going to ask. The same reasoning, and the same shape, as the list endpoint.
+ *
+ * Nothing here is per-viewer — the space, its counts, its admin list are the
+ * same for everyone and already public — so a shared edge copy shows no one
+ * anything they could not read themselves.
+ */
+const SPACE_CACHE = "public, s-maxage=60, stale-while-revalidate=120";
+
 export async function GET(req: NextRequest) {
   const id =
     req.nextUrl.searchParams.get("space") ?? process.env.NEXT_PUBLIC_SPACE_ID!;
@@ -73,6 +95,8 @@ export async function GET(req: NextRequest) {
 
   const totalVotes = importedVotes + nativeVotes;
 
+  // Only the successful response is cached. A 404 from one bad minute at the
+  // database must not be served to everyone for the next one.
   return NextResponse.json({
     space: space as Space,
     stats: {
@@ -83,5 +107,5 @@ export async function GET(req: NextRequest) {
       voterCount,
       avgTurnout: rows.length ? Math.round(totalVotes / rows.length) : 0,
     },
-  });
+  }, { headers: { "Cache-Control": SPACE_CACHE } });
 }
