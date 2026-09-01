@@ -1,3 +1,4 @@
+import { countIdentities } from "./identity";
 import { tally } from "./voting";
 import type { Proposal, TallyResult, Vote } from "./types";
 
@@ -28,6 +29,14 @@ export function resultsFor(proposal: Proposal, votes: Vote[]): TallyResult {
     });
 
     const quorum = Number(proposal.quorum) || 0;
+    const identityQuorum = Number(proposal.identity_quorum) || 0;
+
+    // Imported ballots are the only per-voter record there is. When the source
+    // published a total without them, that total is all anyone has, and it is
+    // taken as-is rather than reported as nobody having voted.
+    const identityCount = votes.length
+      ? countIdentities(votes)
+      : proposal.source_vote_count ?? 0;
 
     // The headline numbers stay as the source published them, but a Copeland
     // result is only checkable if you can see the matchups behind it — so
@@ -44,6 +53,9 @@ export function resultsFor(proposal: Proposal, votes: Vote[]): TallyResult {
       winner,
       pairwise,
       voterCount: proposal.source_vote_count ?? votes.length,
+      identityCount,
+      identityQuorumReached:
+        identityQuorum <= 0 || identityCount >= identityQuorum,
       // Imported tallies arrive already summed, with no per-voter breakdown to
       // recover the power actually cast from, so the two coincide by default.
       participation: total,
@@ -56,7 +68,8 @@ export function resultsFor(proposal: Proposal, votes: Vote[]): TallyResult {
     proposal.voting_system,
     votes,
     proposal.choices.length,
-    Number(proposal.quorum) || 0
+    Number(proposal.quorum) || 0,
+    Number(proposal.identity_quorum) || 0
   );
 }
 

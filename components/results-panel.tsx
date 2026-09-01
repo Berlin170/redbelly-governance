@@ -49,12 +49,14 @@ export function ResultsPanel({
   results,
   choices,
   quorum,
+  identityQuorum = 0,
   state,
   outcome,
 }: {
   results: TallyResult;
   choices: string[];
   quorum: number;
+  identityQuorum?: number;
   state: ProposalState;
   outcome?: Outcome;
 }) {
@@ -164,6 +166,28 @@ export function ResultsPanel({
           <span className="text-muted-foreground">Voters</span>
           <span className="tabular">{results.voterCount}</span>
         </div>
+
+        {/* Shown above the power quorum deliberately. Where a proposal asks
+            both, how many people turned up is the harder threshold to reach
+            and the more informative one to read first. */}
+        {identityQuorum > 0 && (
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="shrink-0 text-muted-foreground">
+              Identity quorum
+            </span>
+            <span
+              className={cn(
+                "tabular text-right",
+                results.identityQuorumReached
+                  ? "text-status-passed"
+                  : "text-status-pending",
+              )}
+            >
+              {results.identityCount} / {identityQuorum}
+              {results.identityQuorumReached ? " reached" : " needed"}
+            </span>
+          </div>
+        )}
 
         {quorum > 0 && (
           <div className="flex items-center justify-between gap-3 text-sm">

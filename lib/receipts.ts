@@ -112,6 +112,7 @@ export function proposalReceipt(
     proposal_id: string;
     snapshot_block?: number | null;
     quorum?: number | null;
+    identity_quorum?: number | null;
     created_at?: string | null;
   }
 ): Receipt {

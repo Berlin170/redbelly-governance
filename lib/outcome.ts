@@ -32,7 +32,7 @@ const NO = /^(against|no|reject|rejected|decline|nay|oppose)\b/i;
  * misreport the DAO's own rules.
  */
 export function outcomeOf(
-  proposal: Pick<ProposalListItem, "choices">,
+  proposal: Pick<ProposalListItem, "choices" | "identity_quorum">,
   results: TallyResult
 ): Outcome {
   if (results.total <= 0 || results.winner == null) {
@@ -40,6 +40,22 @@ export function outcomeOf(
       kind: "no-votes",
       label: "No votes",
       detail: "Closed without a single ballot cast.",
+    };
+  }
+
+  // Both thresholds are quorum, and a proposal that set both had to clear
+  // both. They are reported apart because they fail for opposite reasons and
+  // "no quorum" alone would not say which: enough weight from too few people
+  // reads very differently from enough people holding too little.
+  if (!results.identityQuorumReached) {
+    const needed = Number(proposal.identity_quorum) || 0;
+    return {
+      kind: "no-quorum",
+      label: "No quorum",
+      detail:
+        `Closed with ${results.identityCount} verified ` +
+        `${results.identityCount === 1 ? "voter" : "voters"}, short of the ` +
+        `${needed} this proposal required.`,
     };
   }
 

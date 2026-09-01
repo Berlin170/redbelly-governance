@@ -71,6 +71,13 @@ export interface Proposal {
   token_address: string | null;
   snapshot_block: number | null;
   quorum: number;
+  /**
+   * Distinct verified people who must take part for the vote to carry, on top
+   * of whatever `quorum` asks of voting power. 0 means the proposal does not
+   * ask. See supabase/migrations/010_identity_quorum.sql for why the two are
+   * separate questions.
+   */
+  identity_quorum: number;
   start_at: string;
   end_at: string;
   created_at: string;
@@ -163,6 +170,14 @@ export interface TallyResult {
   total: number;
   winner: number | null;
   quorumReached: boolean;
+  /**
+   * Distinct people behind the ballots, counted through `identityKey` rather
+   * than by counting rows — see lib/identity.ts. Equal to `voterCount` while
+   * one person can still hold several credentialed addresses.
+   */
+  identityCount: number;
+  /** True when the proposal asks for no identity quorum. */
+  identityQuorumReached: boolean;
   voterCount: number;
   /**
    * Voting power actually cast, counting each voter once.

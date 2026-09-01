@@ -318,6 +318,7 @@ export default function ProposalPage({
             results={results}
             choices={proposal.choices}
             quorum={Number(proposal.quorum)}
+            identityQuorum={Number(proposal.identity_quorum) || 0}
             state={state}
             outcome={outcome}
           />

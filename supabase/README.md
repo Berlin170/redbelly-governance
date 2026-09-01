@@ -21,26 +21,32 @@ Run `schema.sql` first, then `migrations/` in numeric order.
 | `migrations/006_replay_protection.sql` | unique signatures, `signed_at` on votes | yes |
 | `migrations/007_avatar_uploads.sql` | the `avatars` storage bucket | yes |
 | `migrations/008_ipfs_receipts.sql` | `signed_at` on proposals, receipt columns | yes |
-| `migrations/009_avatar_uploads_rls.sql` | RLS on `avatar_uploads`, no policy | **not yet** |
+| `migrations/009_avatar_uploads_rls.sql` | RLS on `avatar_uploads`, no policy | yes |
+| `migrations/010_identity_quorum.sql` | `proposals.identity_quorum` | yes |
 
-000 through 008 are live in production, verified 2026-08-30 by reading rows
-that only exist if the migration ran — every native proposal carries both a
-`source_receipt` CID and a `signed_at`, which are 008's columns.
+Everything through 010 is live in production. Nothing here is taken on trust:
+each was verified by reading something that only exists if the migration ran.
 
-**009 is written and not yet applied.** It is the one outstanding schema change:
-`avatar_uploads` is the only table Supabase's default RLS behaviour still
-applies to, meaning the public anon role could read and write it through
-PostgREST. Nothing reaches it today — the anon key and project URL appear in no
-built client file — so this is closing the gap before something opens it. The
-app is unaffected either way, because `/api/avatar` uses the service role, which
-bypasses RLS. Paste it into the SQL editor when convenient; there is no rush and
-no downtime.
+- **000-008**, verified 2026-08-30: every native proposal carries both a
+  `source_receipt` CID and a `signed_at`, which are 008's columns.
+- **009**, verified 2026-09-01: `avatar_uploads` returns one row to the service
+  role and zero to the anon role. That gap *is* the migration — RLS enabled with
+  no policy denies every ordinary role while the service role bypasses it. With
+  009 unapplied both keys would see the same row.
+- **010**, verified 2026-09-01: `identity_quorum` selects, and reads 0 on all 37
+  proposals with no nulls, so nothing already open had a threshold introduced
+  underneath it.
 
-To confirm it took, from the SQL editor:
+Both checks are runnable without the SQL editor, which matters because the key
+in use here writes rows but cannot run DDL. From the SQL editor the equivalents
+are:
 
 ```sql
 select relrowsecurity from pg_class where relname = 'avatar_uploads';
 -- t  once 009 has run
+
+select count(*) filter (where identity_quorum is null) as nulls from proposals;
+-- 0  once 010 has run, and the column exists at all
 ```
 
 ## Why 000 is numbered below 001
@@ -57,7 +63,7 @@ reference to them by number.
 
 ## Adding one
 
-Next number is `010`. Put it in `migrations/`, make it idempotent
+Next number is `011`. Put it in `migrations/`, make it idempotent
 (`add column if not exists`, `create table if not exists`) so a re-run is
 harmless, and make the code tolerate its absence until it is applied —
 `isMissingColumn` in `lib/pg-errors.ts` is how the proposal route degrades to

@@ -1,3 +1,4 @@
+import { countIdentities } from "./identity";
 import type {
   PairwiseResult,
   TallyResult,
@@ -317,13 +318,27 @@ function tallyCopeland(
   return { scores, pairwise, ranking, winner };
 }
 
+/**
+ * `identityQuorum` counts people, `quorum` counts power, and a proposal that
+ * sets both has to clear both. They fail in different ways and neither
+ * catches the other: one large holder clears any power threshold alone, and a
+ * crowd of small holders clears any people threshold while moving very little
+ * weight. Asking both is what makes "the room agreed" mean something.
+ */
 export function tally(
   system: VotingSystem,
   votes: Vote[],
   choiceCount: number,
-  quorum = 0
+  quorum = 0,
+  identityQuorum = 0
 ): TallyResult {
   const voterCount = votes.length;
+
+  // Counted through identityKey, not from votes.length, so this keeps meaning
+  // "people" on the day one person's several addresses collapse into one.
+  const identityCount = countIdentities(votes);
+  const identityQuorumReached =
+    identityQuorum <= 0 || identityCount >= identityQuorum;
 
   if (system === "copeland") {
     const { scores, pairwise, ranking, winner } = tallyCopeland(votes, choiceCount);
@@ -338,6 +353,8 @@ export function tally(
       pairwise,
       ranking,
       voterCount,
+      identityCount,
+      identityQuorumReached,
       participation,
       scoreUnit: "wins",
       quorumReached: quorum <= 0 || participation >= quorum,
@@ -354,6 +371,8 @@ export function tally(
       winner,
       rounds,
       voterCount,
+      identityCount,
+      identityQuorumReached,
       participation: total,
       scoreUnit: "power",
       quorumReached: quorum <= 0 || total >= quorum,
@@ -386,6 +405,8 @@ export function tally(
     total,
     winner,
     voterCount,
+    identityCount,
+    identityQuorumReached,
     participation,
     scoreUnit: "power",
     quorumReached: quorum <= 0 || participation >= quorum,

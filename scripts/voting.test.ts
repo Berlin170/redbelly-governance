@@ -13,11 +13,15 @@ import type { Vote } from "../lib/types";
 let failures = 0;
 let checks = 0;
 
-function ballot(power: number, choice: Vote["choice"]): Vote {
+function ballot(
+  power: number,
+  choice: Vote["choice"],
+  voter = "0x0000000000000000000000000000000000000000"
+): Vote {
   return {
     id: Math.random().toString(36).slice(2),
     proposal_id: "p",
-    voter: "0x0000000000000000000000000000000000000000",
+    voter,
     choice,
     voting_power: power,
     reason: null,
@@ -171,6 +175,75 @@ console.log("\nother systems");
     "quorum at threshold is reached",
     tally("single-choice", [ballot(50, 1)], 2, 50).quorumReached,
     true
+  );
+}
+
+// -------------------------------------------------------- identity quorum
+console.log("\nidentity quorum");
+
+{
+  const three = [
+    ballot(1, 1, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"),
+    ballot(1, 1, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2"),
+    ballot(1, 2, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3"),
+  ];
+
+  const r = tally("single-choice", three, 2, 0, 3);
+  check("three addresses are three identities", r.identityCount, 3);
+  check("an identity quorum at the count is reached", r.identityQuorumReached, true);
+
+  check(
+    "one short is not reached",
+    tally("single-choice", three, 2, 0, 4).identityQuorumReached,
+    false
+  );
+
+  check(
+    "no identity quorum asked is always reached",
+    tally("single-choice", three, 2, 0, 0).identityQuorumReached,
+    true
+  );
+}
+
+{
+  // Addresses arrive checksummed from the chain and lowercased from some
+  // imports. Counting the same person twice because of letter case would
+  // inflate the only number this threshold is made of.
+  const mixed = [
+    ballot(1, 1, "0xAbCdEf0000000000000000000000000000000001"),
+    ballot(1, 2, "0xabcdef0000000000000000000000000000000001"),
+  ];
+  const r = tally("single-choice", mixed, 2, 0, 2);
+  check("one address in two cases is one identity", r.identityCount, 1);
+  check("and it does not reach a quorum of two", r.identityQuorumReached, false);
+  check("while the ballots are still both counted", r.voterCount, 2);
+}
+
+{
+  // The failure the threshold exists to catch: one holder, all the weight,
+  // clearing any power quorum the DAO could set while alone in the room.
+  const whale = [ballot(1_000_000, 1, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1")];
+  const r = tally("single-choice", whale, 2, 100, 5);
+  check("a whale alone still meets the power quorum", r.quorumReached, true);
+  check("but not the identity quorum", r.identityQuorumReached, false);
+}
+
+{
+  // Ranked and Copeland return from their own branches, so they carry the
+  // count separately and have regressed independently before.
+  const ranked = [
+    ballot(1, [1, 2], "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"),
+    ballot(1, [2, 1], "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2"),
+  ];
+  check(
+    "ranked-choice carries the identity count",
+    tally("ranked-choice", ranked, 2, 0, 2).identityQuorumReached,
+    true
+  );
+  check(
+    "copeland carries the identity count",
+    tally("copeland", ranked, 2, 0, 3).identityQuorumReached,
+    false
   );
 }
 

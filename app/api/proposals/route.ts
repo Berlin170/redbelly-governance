@@ -222,6 +222,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Voting must close after it opens." }, { status: 400 });
     }
 
+    // An identity quorum counts the people who voted, and that count is only
+    // a count of *verified* people if every ballot had to pass the gate to be
+    // cast. Without `requireVerified` the same number is a count of addresses,
+    // which is the thing this threshold exists to stop being mistaken for a
+    // headcount. Refused rather than silently counted, because a proposal that
+    // displayed "12 verified voters" about twelve unchecked wallets would be
+    // making a claim the portal cannot support.
+    const identityQuorum = Number(message.identityQuorum ?? 0);
+    if (!Number.isFinite(identityQuorum) || identityQuorum < 0) {
+      return NextResponse.json(
+        { error: "Identity quorum must be zero or greater." },
+        { status: 400 }
+      );
+    }
+    if (identityQuorum > 0 && !message.requireVerified) {
+      return NextResponse.json(
+        {
+          error:
+            "An identity quorum needs identity-gated voting. Without the " +
+            "gate there is no way to tell a verified voter from any other " +
+            "address.",
+        },
+        { status: 400 }
+      );
+    }
+
     // Balances are read at this block for the whole vote, so buying tokens
     // after a proposal opens cannot buy voting power in it.
     let snapshotBlock: number | null = null;
@@ -281,6 +307,7 @@ export async function POST(req: NextRequest) {
       token_address: message.tokenAddress || null,
       snapshot_block: snapshotBlock,
       quorum: Number(message.quorum ?? 0),
+      identity_quorum: identityQuorum,
       start_at: new Date(start * 1000).toISOString(),
       end_at: new Date(end * 1000).toISOString(),
       signature,
@@ -294,8 +321,21 @@ export async function POST(req: NextRequest) {
     const db = supabaseAdmin();
     let { data, error } = await db.from("proposals").insert(row).select().single();
 
-    // signed_at arrives with migration 008, and this deployment may be ahead of
-    // the SQL editor. Dropping it costs the receipt, not the proposal.
+    // Two columns here arrive by hand-run migration, and this deployment may
+    // be ahead of the SQL editor on either. Each is dropped in turn rather
+    // than together, so a schema missing only one of them keeps the other.
+    //
+    // Order matters: identity_quorum (010) is the newer of the two, so a
+    // deployment behind on both fails on it first.
+    if (error && isMissingColumn(error)) {
+      console.warn(
+        "[proposals] identity_quorum is missing — identity quorums are OFF " +
+          "until supabase/migrations/010_identity_quorum.sql has been run."
+      );
+      delete row.identity_quorum;
+      ({ data, error } = await db.from("proposals").insert(row).select().single());
+    }
+
     if (error && isMissingColumn(error)) {
       console.warn(
         "[proposals] signed_at is missing — IPFS receipts are OFF until " +
@@ -347,6 +387,7 @@ export async function POST(req: NextRequest) {
             proposal_id: created.id,
             snapshot_block: snapshotBlock,
             quorum: Number(message.quorum ?? 0),
+            identity_quorum: identityQuorum,
             created_at: created.created_at ?? null,
           }
         ),

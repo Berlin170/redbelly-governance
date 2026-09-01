@@ -38,6 +38,8 @@ function tally(part: Partial<TallyResult>): TallyResult {
     total: 0,
     winner: null,
     quorumReached: true,
+    identityCount: 0,
+    identityQuorumReached: true,
     voterCount: 0,
     participation: 0,
     scoreUnit: "power",
@@ -45,7 +47,16 @@ function tally(part: Partial<TallyResult>): TallyResult {
   };
 }
 
-const forAgainst = { choices: ["For", "Against", "Abstain"] };
+/**
+ * The proposal fields outcomeOf reads. `identity_quorum` defaults to off so
+ * the existing cases keep asking what they always asked; the cases that care
+ * about it pass one.
+ */
+function p(choices: string[], identity_quorum = 0) {
+  return { choices, identity_quorum };
+}
+
+const forAgainst = p(["For", "Against", "Abstain"]);
 
 console.log("\nnothing was decided");
 {
@@ -129,14 +140,14 @@ console.log("\nyes and no are decisions");
   ] as const) {
     check(
       `"${word}" reads as ${expected}`,
-      outcomeOf({ choices: [word, "Other"] }, tally({ scores: [1, 0], total: 1, winner: 1 })).label,
+      outcomeOf(p([word, "Other"]), tally({ scores: [1, 0], total: 1, winner: 1 })).label,
       expected
     );
   }
 
   check(
     "case and surrounding space do not matter",
-    outcomeOf({ choices: ["  fOr  ", "Against"] }, tally({ scores: [1, 0], total: 1, winner: 1 })).label,
+    outcomeOf(p(["  fOr  ", "Against"]), tally({ scores: [1, 0], total: 1, winner: 1 })).label,
     "Passed"
   );
 }
@@ -151,30 +162,30 @@ console.log("\na choice that merely starts with a decision word is not one");
   */
   check(
     "Formalise is not For",
-    outcomeOf({ choices: ["Formalise the treasury structure", "Something else"] },
+    outcomeOf(p(["Formalise the treasury structure", "Something else"]),
       tally({ scores: [1, 0], total: 1, winner: 1 })).kind,
     "winner"
   );
   check(
     "Nayland is not Nay",
-    outcomeOf({ choices: ["Nayland", "Other"] }, tally({ scores: [1, 0], total: 1, winner: 1 })).kind,
+    outcomeOf(p(["Nayland", "Other"]), tally({ scores: [1, 0], total: 1, winner: 1 })).kind,
     "winner"
   );
   check(
     "Norman is not No",
-    outcomeOf({ choices: ["Norman", "Other"] }, tally({ scores: [1, 0], total: 1, winner: 1 })).kind,
+    outcomeOf(p(["Norman", "Other"]), tally({ scores: [1, 0], total: 1, winner: 1 })).kind,
     "winner"
   );
   check(
     "Approve is still Approve",
-    outcomeOf({ choices: ["Approve", "Other"] }, tally({ scores: [1, 0], total: 1, winner: 1 })).kind,
+    outcomeOf(p(["Approve", "Other"]), tally({ scores: [1, 0], total: 1, winner: 1 })).kind,
     "passed"
   );
 }
 
 console.log("\nan election has a winner, not a verdict");
 {
-  const election = { choices: ["Buffy", "Willow", "Xander"] };
+  const election = p(["Buffy", "Willow", "Xander"]);
 
   // Saying a candidate "Passed" would be an invention: nobody voted on a
   // proposition, they picked a person.
@@ -187,8 +198,114 @@ console.log("\nan election has a winner, not a verdict");
   // why the card now prefixes it and the badge carries a cup.
   check(
     "a numbered choice still comes back as its own name",
-    outcomeOf({ choices: ["1", "2", "3"] }, tally({ scores: [0, 9, 0], total: 9, winner: 2 })).label,
+    outcomeOf(p(["1", "2", "3"]), tally({ scores: [0, 9, 0], total: 9, winner: 2 })).label,
     "2"
+  );
+}
+
+console.log("\nan identity quorum is a quorum");
+{
+  const gated = p(["For", "Against", "Abstain"], 5);
+
+  // The case the whole feature exists for: plenty of weight, from too few
+  // people. Under a power quorum alone this reads as a decision.
+  check(
+    "power was met but not enough people",
+    outcomeOf(
+      gated,
+      tally({
+        scores: [900, 0, 0],
+        total: 900,
+        winner: 1,
+        quorumReached: true,
+        identityCount: 2,
+        identityQuorumReached: false,
+      })
+    ).kind,
+    "no-quorum"
+  );
+
+  // Whoever reads this has to be able to tell which threshold failed, or the
+  // fix for a proposal that keeps missing quorum is a guess.
+  check(
+    "the detail names the people, not the power",
+    outcomeOf(
+      gated,
+      tally({
+        scores: [900, 0, 0],
+        total: 900,
+        winner: 1,
+        quorumReached: true,
+        identityCount: 2,
+        identityQuorumReached: false,
+      })
+    ).detail,
+    "Closed with 2 verified voters, short of the 5 this proposal required."
+  );
+
+  check(
+    "one voter is not pluralised",
+    outcomeOf(
+      gated,
+      tally({
+        scores: [900, 0, 0],
+        total: 900,
+        winner: 1,
+        identityCount: 1,
+        identityQuorumReached: false,
+      })
+    ).detail,
+    "Closed with 1 verified voter, short of the 5 this proposal required."
+  );
+
+  // Both thresholds have to hold. A crowd that turned up holding nothing is
+  // as short of quorum as one holder who turned up alone.
+  check(
+    "enough people but not enough power",
+    outcomeOf(
+      gated,
+      tally({
+        scores: [4, 0, 0],
+        total: 4,
+        winner: 1,
+        quorumReached: false,
+        identityCount: 9,
+        identityQuorumReached: true,
+      })
+    ).kind,
+    "no-quorum"
+  );
+
+  check(
+    "both met carries as normal",
+    outcomeOf(
+      gated,
+      tally({
+        scores: [900, 100, 0],
+        total: 1000,
+        winner: 1,
+        quorumReached: true,
+        identityCount: 9,
+        identityQuorumReached: true,
+      })
+    ).label,
+    "Passed"
+  );
+
+  // No votes still outranks it, for the same reason it outranks power quorum:
+  // the emptier fact is the one that explains itself.
+  check(
+    "no votes outranks a missed identity quorum",
+    outcomeOf(
+      gated,
+      tally({
+        total: 0,
+        winner: null,
+        identityCount: 0,
+        identityQuorumReached: false,
+      })
+    ).kind,
+    "no-votes"
   );
 }
 
@@ -198,12 +315,12 @@ console.log("\nmalformed input is answered, not thrown at");
   // crash the list for every other proposal on the page.
   check(
     "a winner past the end of choices",
-    outcomeOf({ choices: ["For", "Against"] }, tally({ scores: [1, 0], total: 1, winner: 9 })).kind,
+    outcomeOf(p(["For", "Against"]), tally({ scores: [1, 0], total: 1, winner: 9 })).kind,
     "winner"
   );
   check(
     "no choices at all",
-    outcomeOf({ choices: [] }, tally({ total: 1, winner: 1 })).kind,
+    outcomeOf(p([]), tally({ total: 1, winner: 1 })).kind,
     "winner"
   );
 }

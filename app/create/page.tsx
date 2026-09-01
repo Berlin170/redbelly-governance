@@ -31,6 +31,7 @@ import { useSpace } from "@/components/space-provider";
 import { domain, proposalTypes } from "@/lib/eip712";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import { accessContract, activeChain } from "@/lib/chains";
+import { ADDRESSES_PER_CREDENTIAL } from "@/lib/identity";
 import { PROPOSAL_THRESHOLD } from "@/lib/limits";
 
 /**
@@ -98,6 +99,7 @@ export default function CreatePage() {
   const [strategy, setStrategy] = useState<VotingStrategy>("native-balance");
   const [tokenAddress, setTokenAddress] = useState("");
   const [quorum, setQuorum] = useState("0");
+  const [identityQuorum, setIdentityQuorum] = useState("0");
   const [days, setDays] = useState("5");
   const [submitting, setSubmitting] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -170,6 +172,7 @@ export default function CreatePage() {
             timestamp: message.timestamp.toString(),
             tokenAddress: tokenAddress.trim(),
             quorum,
+            identityQuorum,
           },
           signature,
         }),
@@ -372,6 +375,40 @@ export default function CreatePage() {
             </div>
           </div>
 
+          {/* Only offered where ballots are identity-gated. Elsewhere this
+              would count addresses while calling them people, and the server
+              refuses it for the same reason. */}
+          {identityAvailable && (
+            <div className="space-y-1.5">
+              <Label htmlFor="identity-quorum">
+                Identity quorum (0 for none)
+              </Label>
+              <Input
+                id="identity-quorum"
+                type="number"
+                min={0}
+                value={identityQuorum}
+                onChange={(e) => setIdentityQuorum(e.target.value)}
+                className="tabular"
+              />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Distinct verified voters who must take part, however much
+                weight they carry. A power quorum can be met by one large
+                holder alone; this cannot.
+                {Number(identityQuorum) > 0 && (
+                  <>
+                    {" "}
+                    One credential currently enables up to about{" "}
+                    {ADDRESSES_PER_CREDENTIAL} addresses, so treat{" "}
+                    {Number(identityQuorum).toLocaleString()} as a floor on
+                    addresses rather than a proof of{" "}
+                    {Number(identityQuorum).toLocaleString()} separate people.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+
           {isConnected ? (
             <div className="space-y-2">
               <div className="flex gap-2">
@@ -477,6 +514,16 @@ export default function CreatePage() {
                   {Number(quorum) > 0 ? Number(quorum).toLocaleString() : "None"}
                 </dd>
               </div>
+              {identityAvailable && (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted-foreground">Identity quorum</dt>
+                  <dd className="tabular text-right">
+                    {Number(identityQuorum) > 0
+                      ? `${Number(identityQuorum).toLocaleString()} voters`
+                      : "None"}
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
 
