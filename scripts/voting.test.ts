@@ -7,7 +7,7 @@
  * rather than against whatever the implementation currently returns.
  */
 
-import { tally } from "../lib/voting";
+import { tally, tallyByIdentity } from "../lib/voting";
 import type { Vote } from "../lib/types";
 
 let failures = 0;
@@ -244,6 +244,79 @@ console.log("\nidentity quorum");
     "copeland carries the identity count",
     tally("copeland", ranked, 2, 0, 3).identityQuorumReached,
     false
+  );
+}
+
+// ------------------------------------------------- one vote per person
+console.log("\ntallyByIdentity");
+
+{
+  // The whole point, in one case: a holder with almost all the weight loses a
+  // vote they win outright on the weighted count.
+  const votes = [
+    ballot(1_000_000, 1, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"),
+    ballot(1, 2, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2"),
+    ballot(1, 2, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3"),
+  ];
+
+  check("weighted, the whale wins", tally("single-choice", votes, 2).winner, 1);
+  check(
+    "per person, the two others win",
+    tallyByIdentity("single-choice", votes, 2).winner,
+    2
+  );
+  check(
+    "every voter weighs exactly one",
+    tallyByIdentity("single-choice", votes, 2).scores,
+    [1, 2]
+  );
+}
+
+{
+  // Holding nothing is not the same as not turning up. A zero-power ballot is
+  // invisible to the weighted tally and is a whole vote in this one.
+  const votes = [ballot(0, 1, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"), ballot(5, 2, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2")];
+  check("zero power casts no weight", tally("single-choice", votes, 2).scores, [0, 5]);
+  check(
+    "but is still a person",
+    tallyByIdentity("single-choice", votes, 2).scores,
+    [1, 1]
+  );
+}
+
+{
+  // One person, two ballots. Impossible today — one address votes once, and
+  // every address is its own identity — so this pins the behaviour before
+  // identityKey starts grouping addresses and makes it reachable.
+  const a = "0xAbCdEf0000000000000000000000000000000001";
+  const early = { ...ballot(1, 1, a), signed_at: 1_000 };
+  const late = { ...ballot(1, 2, a.toLowerCase()), signed_at: 2_000 };
+
+  const r = tallyByIdentity("single-choice", [early, late], 2);
+  check("two ballots from one identity count once", r.identityCount, 1);
+  check("and it is the later one that counts", r.scores, [0, 1]);
+
+  // Order of arrival must not decide it; the signed time does.
+  check(
+    "regardless of the order they arrive in",
+    tallyByIdentity("single-choice", [late, early], 2).scores,
+    [0, 1]
+  );
+}
+
+{
+  // Ranked methods run through the same flattening, and a Copeland tally over
+  // equal weights is the matchup count it should be.
+  const votes = [
+    ballot(900, [2, 1], "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"),
+    ballot(1, [1, 2], "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2"),
+    ballot(1, [1, 2], "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3"),
+  ];
+  check("weighted copeland follows the weight", tally("copeland", votes, 2).winner, 2);
+  check(
+    "per person it follows the people",
+    tallyByIdentity("copeland", votes, 2).winner,
+    1
   );
 }
 

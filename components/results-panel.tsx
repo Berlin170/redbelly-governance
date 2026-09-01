@@ -52,6 +52,8 @@ export function ResultsPanel({
   identityQuorum = 0,
   state,
   outcome,
+  title = "Results",
+  note,
 }: {
   results: TallyResult;
   choices: string[];
@@ -59,6 +61,10 @@ export function ResultsPanel({
   identityQuorum?: number;
   state: ProposalState;
   outcome?: Outcome;
+  /** Named so a second panel on the same page is not also called "Results". */
+  title?: string;
+  /** Printed under the bars, for a panel that has to say what it is. */
+  note?: string;
 }) {
   const max = Math.max(...results.scores, 0);
   const hasPairwise = results.system === "copeland" && !!results.pairwise;
@@ -91,7 +97,7 @@ export function ResultsPanel({
   return (
     <Card className="overflow-hidden">
       <CardHeader className="pb-3">
-        <CardTitle className="display text-base">Results</CardTitle>
+        <CardTitle className="display text-base">{title}</CardTitle>
 
         {/* The verdict, stated. The detail page previously showed only
             "Closed" while the proposal list showed "Rejected" for the same
@@ -154,6 +160,12 @@ export function ResultsPanel({
             );
           })}
         </div>
+
+        {note && (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {note}
+          </p>
+        )}
 
         {isApproval && (
           <p className="text-xs leading-relaxed text-muted-foreground">

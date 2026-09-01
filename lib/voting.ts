@@ -1,4 +1,4 @@
-import { countIdentities } from "./identity";
+import { countIdentities, identityKey } from "./identity";
 import type {
   PairwiseResult,
   TallyResult,
@@ -411,6 +411,66 @@ export function tally(
     scoreUnit: "power",
     quorumReached: quorum <= 0 || participation >= quorum,
   };
+}
+
+/**
+ * When a ballot was cast, for picking between two from the same person.
+ *
+ * `signed_at` is the only one of these the voter actually signed; the others
+ * are the database's account of when it arrived. Preferred for that reason,
+ * and the fallbacks exist because imported history has no signature over this
+ * portal's domain and so has no signed time to read.
+ */
+function ballotTime(vote: Vote): number {
+  if (vote.signed_at != null) return vote.signed_at * 1000;
+  if (vote.voted_at) return new Date(vote.voted_at).getTime();
+  return new Date(vote.created_at).getTime();
+}
+
+/**
+ * The same ballots, counted one vote per person.
+ *
+ * This is the second chamber, and it is advisory: it changes no outcome and
+ * decides nothing. It exists so a DAO can see both answers to the same
+ * question before being asked whether to let the second one count — where the
+ * two agree there is nothing to argue about, and where they disagree, that
+ * disagreement is the most informative thing on the page.
+ *
+ * Only meaningful on an identity-gated proposal. Every ballot on one of those
+ * passed the access contract to be cast, so flattening the weights leaves a
+ * count of verified people rather than a count of whoever turned up. The
+ * caller is responsible for not asking otherwise; there is no cheap way to
+ * check it here, since eligibility is a chain read per voter.
+ *
+ * Several ballots from one person collapse to their most recent. That cannot
+ * happen today — one address casts one ballot, and every address is its own
+ * identity — but it is what should happen the moment `identityKey` learns to
+ * group a person's addresses, and deciding it now is easier than discovering
+ * it later with a live vote to explain.
+ */
+export function tallyByIdentity(
+  system: VotingSystem,
+  votes: Vote[],
+  choiceCount: number,
+  identityQuorum = 0
+): TallyResult {
+  const latest = new Map<string, Vote>();
+
+  for (const vote of votes) {
+    const key = identityKey(vote.voter);
+    const held = latest.get(key);
+    if (!held || ballotTime(vote) > ballotTime(held)) latest.set(key, vote);
+  }
+
+  // Weight is what separates the chambers, so it is the only thing changed.
+  // A zero-power ballot becomes a vote here, which is the point: holding
+  // nothing is not the same as not turning up.
+  const equal = [...latest.values()].map((vote) => ({
+    ...vote,
+    voting_power: 1,
+  }));
+
+  return tally(system, equal, choiceCount, 0, identityQuorum);
 }
 
 /** Human-readable summary of one ballot, for the voters table. */

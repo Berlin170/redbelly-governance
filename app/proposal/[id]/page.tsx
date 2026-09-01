@@ -28,6 +28,7 @@ import {
 } from "@/lib/utils";
 import { explorerAddress } from "@/lib/chains";
 import { outcomeOf } from "@/lib/outcome";
+import { tallyByIdentity } from "@/lib/voting";
 import { useProfile, displayName } from "@/lib/use-profiles";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import type { Proposal, TallyResult, Vote } from "@/lib/types";
@@ -87,6 +88,56 @@ export default function ProposalPage({
         : undefined,
     [data, state],
   );
+
+  /**
+   * The second chamber, shown beside the first and deciding nothing.
+   *
+   * Only on an identity-gated proposal, because only there is every ballot
+   * known to be a verified person's, and only where the weighting strategy is
+   * something other than identity — a one-person-one-vote proposal is already
+   * this tally, and printing it twice would suggest two chambers had agreed
+   * when only one was ever counted.
+   */
+  const peoples = useMemo(() => {
+    if (!data) return undefined;
+    const { proposal, votes } = data;
+    if (!proposal.require_verified) return undefined;
+    if (proposal.strategy === "verified-identity") return undefined;
+    if (votes.length === 0) return undefined;
+    return tallyByIdentity(
+      proposal.voting_system,
+      votes,
+      proposal.choices.length,
+      Number(proposal.identity_quorum) || 0,
+    );
+  }, [data]);
+
+  /**
+   * What the two chambers say about each other.
+   *
+   * The agreement is worth stating outright rather than leaving to be read off
+   * two sets of bars: where they agree the weighted result needs no defending,
+   * and where they diverge that is the single most useful fact on the page —
+   * it means the holders and the people wanted different things, which is the
+   * whole argument for counting both.
+   */
+  const peoplesNote = useMemo(() => {
+    const base =
+      "Advisory, and decides nothing. Every verified voter counts once here, " +
+      "however much they hold.";
+    if (!data || !peoples) return base;
+
+    const named = (n: number | null) =>
+      n == null ? null : (data.proposal.choices[n - 1] ?? null);
+    const byPower = named(data.results.winner);
+    const byPerson = named(peoples.winner);
+    if (!byPower || !byPerson) return base;
+
+    return byPower === byPerson
+      ? `${base} It agrees with the weighted count: ${byPower} leads both.`
+      : `${base} It disagrees with the weighted count, which has ${byPower} ` +
+          `ahead while the people here prefer ${byPerson}.`;
+  }, [data, peoples]);
 
   if (error) {
     return (
@@ -322,6 +373,16 @@ export default function ProposalPage({
             state={state}
             outcome={outcome}
           />
+          {peoples && (
+            <ResultsPanel
+              results={peoples}
+              choices={proposal.choices}
+              quorum={0}
+              state={state}
+              title="One vote per person"
+              note={peoplesNote}
+            />
+          )}
         </div>
       </div>
     </div>
