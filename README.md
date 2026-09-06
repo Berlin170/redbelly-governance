@@ -175,9 +175,19 @@ keeps. Set `NEXT_PUBLIC_IDENTITY_REGISTRY` only to override that address.
 test: it also answers true for businesses, which are granted through separate
 extender contracts, and it answers true for *every* address if permissioned
 access is ever switched off. So an individual is an address the access
-contract allows, that no extender claims, while permissioned access is on. The
-passport check behind the individual path happens off chain at the issuer;
-what the chain carries is the credential presented to `request`.
+contract allows, while permissioned access is on, that either no extender
+claims or that the contract's own KYC set still records a passport against.
+That second clause matters: a person who has also registered a business holds
+both grants, and subtracting every extender-claimed address takes the vote off
+real members — of the three extender-claimed addresses that have voted here,
+only one is a company; the other two belong to a member who had already voted
+with them. Since the ABI exposes no getter for the KYC set, that clause reads the
+mapping out of contract storage, and it proves the slot still behaves like the
+mapping before believing any answer from it (`passedKyc` in
+`lib/voting-power.ts`). If the check cannot be made, the address is refused
+rather than admitted. The passport check behind the individual path happens off
+chain at the issuer; what the chain carries is the credential presented to
+`request`.
 
 **The electorate is frozen at the proposal's snapshot block.** `isAllowed` is
 read at that block, not at vote time, so an address credentialed after a vote

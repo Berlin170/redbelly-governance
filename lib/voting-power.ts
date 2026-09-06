@@ -1,9 +1,19 @@
-import { createPublicClient, http, formatEther, getAddress } from "viem";
+import {
+  createPublicClient,
+  http,
+  formatEther,
+  getAddress,
+  keccak256,
+  encodeAbiParameters,
+  zeroAddress,
+} from "viem";
 import {
   accessContract,
   accessContractIsPinned,
   activeChain,
   bootstrapRegistry,
+  KYC_LAYOUT_CANARY,
+  KYC_USERS_SLOT,
   RPC_URL,
 } from "./chains";
 import { supabaseAdmin } from "./supabase";
@@ -66,6 +76,58 @@ const permissionAbi = [
   },
 ] as const;
 
+/** Where `kycUsers[address]` lives, by Solidity's mapping slot rule. */
+function kycSlot(address: `0x${string}`): `0x${string}` {
+  return keccak256(
+    encodeAbiParameters(
+      [{ type: "address" }, { type: "uint256" }],
+      [address, KYC_USERS_SLOT]
+    )
+  );
+}
+
+/** A storage word read as the boolean a `mapping(address => bool)` holds. */
+function asFlag(word: `0x${string}` | undefined): boolean | null {
+  if (!word) return null;
+  const value = BigInt(word);
+  if (value === 0n) return false;
+  if (value === 1n) return true;
+  return null;
+}
+
+/**
+ * Did this address pass Redbelly's passport KYC?
+ *
+ * Only asked about addresses an extender claims, which is a handful of the
+ * electorate — everyone else is settled by the ABI alone and never reaches a
+ * storage read.
+ *
+ * The slot is not part of any published interface, so the reads that answer
+ * the question are accompanied by two that check the question is still being
+ * asked of the right place: an address known to hold KYC must read true, and
+ * the zero address must read false. If either control disagrees, the layout
+ * has moved and we return null rather than a guess. Refusing a vote is loud
+ * and the voter says so; admitting a company as a person is silent.
+ */
+async function passedKyc(
+  registry: `0x${string}`,
+  address: `0x${string}`,
+  at: { blockNumber?: bigint }
+): Promise<boolean | null> {
+  try {
+    const [subject, control, empty] = await Promise.all(
+      [address, KYC_LAYOUT_CANARY, zeroAddress as `0x${string}`].map((a) =>
+        client.getStorageAt({ address: registry, slot: kycSlot(a), ...at })
+      )
+    );
+
+    if (asFlag(control) !== true || asFlag(empty) !== false) return null;
+    return asFlag(subject);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolved once per process. The registry answer cannot change without a
  * governance action on Redbelly's side, and re-reading it on every vote would
@@ -126,9 +188,14 @@ export function identityRegistryConfigured(): boolean {
  * access off, or this address passed KYC, or some extender vouches for it",
  * and the extenders are what grant *business* accounts. A registered company
  * therefore answers true, and counting it as a person would hand a legal
- * entity a human's vote. An individual is an address the access contract
- * allows that no extender claims — the same rule Redbelly's own
- * `permission-validation` sample uses to separate KYC from KYB.
+ * entity a human's vote.
+ *
+ * So an individual is an address the access contract allows that no extender
+ * claims — or that one does claim while the contract's KYC set still records a
+ * passport against it, because a person who also registered a business holds
+ * both grants and is no less a person for it. Redbelly's own
+ * `permission-validation` sample stops at the subtraction; that is where it is
+ * wrong, and it cost a real member their vote here.
  *
  * Note what this does and does not prove. It establishes that an address
  * belongs to a verified person. It does not establish that two addresses
@@ -222,7 +289,15 @@ async function verifiedIdentityPower(
       )
     );
 
-    return businessChecks.some(Boolean) ? 0 : 1;
+    if (!businessChecks.some(Boolean)) return 1;
+
+    // Claimed by an extender — but a business grant does not cancel a passport.
+    // A person who registered a company holds both, and subtracting every
+    // extender-claimed address took the vote off two addresses belonging to a
+    // member who had already voted in earlier gated proposals with them. So
+    // ask the KYC set directly, and only rule the address a company when it
+    // answers false. Unreadable counts as false: see `passedKyc`.
+    return (await passedKyc(registry, address, at)) === true ? 1 : 0;
   }
 
   const { data } = await supabaseAdmin()

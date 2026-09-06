@@ -59,6 +59,35 @@ export const BOOTSTRAP_CONTRACTS_REGISTRY: Record<number, `0x${string}`> = {
 };
 
 /**
+ * Where the access contract keeps its KYC set.
+ *
+ * `PermissionUpgradeable` exposes no getter for it — `isAllowed` folds KYC and
+ * business grants into one boolean — so the only way to ask "did *this person*
+ * pass a passport check" is to read the mapping out of storage. Slot 20 was
+ * found by probing and then checked against every address that has ever voted
+ * here: it is 1 for all 155 KYC'd voters, 0 for the one business-only account
+ * and for all four addresses the contract does not allow, and never holds a
+ * value other than 0 or 1.
+ *
+ * This is the one thing here that reads a contract's internals rather than its
+ * ABI, and an upgrade could move it without warning. `passedKyc` in
+ * `voting-power.ts` therefore proves the slot still behaves like the mapping
+ * before trusting a single answer from it.
+ */
+export const KYC_USERS_SLOT = 20n;
+
+/**
+ * An address known to have passed KYC, used to prove the slot above still
+ * points at the mapping. It reads 1 at every block back to 1,000,000, so it
+ * works as a control at historical snapshot blocks too. This is the operator's
+ * own verified wallet by default — pinning a stranger's would make our gate
+ * depend on someone else's credential staying valid.
+ */
+export const KYC_LAYOUT_CANARY: `0x${string}` =
+  (process.env.NEXT_PUBLIC_KYC_LAYOUT_CANARY as `0x${string}`) ??
+  "0xB80e7a43F8A162CED2DD367A1d41F9B28Cd0e7Aa";
+
+/**
  * Defaults to mainnet. A missing env var should fail loudly against the real
  * chain rather than quietly serve testnet results as if they counted.
  */
