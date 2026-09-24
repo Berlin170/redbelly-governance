@@ -50,7 +50,7 @@ export const VOTING_SYSTEMS: {
   },
   {
     value: "one-person-one-vote",
-    label: "One person, one vote",
+    label: "One verified address, one vote",
     description:
       "Every identity-verified address gets exactly one vote regardless of holdings.",
   },

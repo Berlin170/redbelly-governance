@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAccount, useSignTypedData } from "wagmi";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +20,7 @@ import { ConnectWallet } from "@/components/connect-wallet";
 import { HowVotingWorks } from "@/components/how-voting-works";
 import { domain, voteTypes, buildVoteMessage } from "@/lib/eip712";
 import { describeChoice, validateChoice, VOTING_SYSTEMS } from "@/lib/voting";
-import { cn } from "@/lib/utils";
+import { cn, receiptUrl, formatVotingDate } from "@/lib/utils";
 import { activeChain } from "@/lib/chains";
 import type { Proposal, Vote, VoteChoice } from "@/lib/types";
 import {
@@ -31,7 +32,13 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-export function VotePanel({
+export function VotePanel(props: { proposal: Proposal; votes: Vote[]; onVoted: () => void }) {
+  const { address } = useAccount();
+  // Changing accounts starts a fresh ballot and closes any previous review.
+  return <WalletVotePanel key={`${props.proposal.id}:${address ?? "disconnected"}`} {...props} />;
+}
+
+function WalletVotePanel({
   proposal,
   votes,
   onVoted,
@@ -42,7 +49,9 @@ export function VotePanel({
 }) {
   const { address, isConnected } = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
-  const [submitting, setSubmitting] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "wallet" | "saving">("idle");
+  const submitting = phase !== "idle";
+  const [recordedVote, setRecordedVote] = useState<Vote | null>(null);
   const [reason, setReason] = useState("");
   /** The review step. A signature request is the moment a visitor is most
    *  likely to bail, and the old flow threw the wallet prompt at them with no
@@ -63,33 +72,36 @@ export function VotePanel({
 
   /** The ballot this address already cast, if it has. Votes are upserts, so
    *  this is an edit rather than a second vote. */
-  const myVote = votes.find(
+  const existingVote = votes.find(
     (v) => v.voter.toLowerCase() === (address ?? "").toLowerCase()
   );
+  const savedVote = recordedVote?.voter.toLowerCase() === address?.toLowerCase()
+    && recordedVote?.proposal_id === proposal.id ? recordedVote : null;
+  const myVote = savedVote && (!existingVote ||
+    (savedVote.signed_at ?? 0) > (existingVote.signed_at ?? 0))
+    ? savedVote : existingVote;
+  const receipt = receiptUrl(myVote?.source_receipt, myVote?.source);
 
   /** What this address may cast, read before signing rather than after. */
-  const [power, setPower] = useState<number | null>(null);
-  const [powerNote, setPowerNote] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!address) {
-      setPower(null);
-      setPowerNote(null);
-      return;
-    }
-    let live = true;
-    fetch(`/api/power?proposal=${proposal.id}&voter=${address}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (!live) return;
-        setPower(typeof json.power === "number" ? json.power : null);
-        setPowerNote(json.unavailable ?? null);
-      })
-      .catch(() => live && setPowerNote("Voting power could not be read."));
-    return () => {
-      live = false;
-    };
-  }, [address, proposal.id, votes]);
+  const eligibility = useQuery({
+    queryKey: ["voting-power", proposal.id, address],
+    enabled: !!address && isConnected,
+    retry: false,
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/power?proposal=${proposal.id}&voter=${address}`, { signal });
+      const json = await response.json();
+      if (!response.ok || json.error) throw new Error("Eligibility could not be checked. Please try again.");
+      if (typeof json.power !== "number" || !Number.isFinite(json.power)) {
+        throw new Error("Voting power could not be read. Please try again.");
+      }
+      return json as { power: number; unavailable?: string; blocked?: boolean };
+    },
+  });
+  const power = eligibility.data?.power ?? null;
+  const powerNote = eligibility.error?.message ?? eligibility.data?.unavailable;
+  const eligible = isConnected && !eligibility.isFetching && !powerNote && power !== null && power > 0;
+  const powerUnit = proposal.strategy === "verified-identity" ? "vote" :
+    proposal.strategy === "native-balance" ? activeChain.nativeCurrency.symbol : "voting power";
 
   // Show the existing ballot in the controls, so the panel reflects what this
   // address has already said instead of presenting a blank form.
@@ -140,6 +152,12 @@ export function VotePanel({
 
   /** Validate first, then show what is about to be signed. */
   function review() {
+    if (!eligible) return;
+    if (Date.now() >= Date.parse(proposal.end_at)) {
+      toast.error("Voting has closed.");
+      onVoted();
+      return;
+    }
     try {
       validateChoice(system, currentChoice(), choices.length);
     } catch (err) {
@@ -150,7 +168,13 @@ export function VotePanel({
   }
 
   async function submit() {
-    if (!address) return;
+    if (!address || !eligible || submitting) return;
+    if (Date.now() >= Date.parse(proposal.end_at)) {
+      toast.error("Voting has closed.");
+      setConfirming(false);
+      onVoted();
+      return;
+    }
     const choice = currentChoice();
 
     try {
@@ -160,7 +184,7 @@ export function VotePanel({
       return;
     }
 
-    setSubmitting(true);
+    setPhase("wallet");
     try {
       const message = buildVoteMessage({
         from: address,
@@ -177,6 +201,7 @@ export function VotePanel({
         message,
       });
 
+      setPhase("saving");
       const res = await fetch("/api/votes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -190,6 +215,7 @@ export function VotePanel({
       if (!res.ok) throw new Error(json.error ?? "The vote was not recorded.");
 
       toast.success("Vote recorded.");
+      setRecordedVote(json.vote);
       setConfirming(false);
       onVoted();
     } catch (err) {
@@ -197,7 +223,7 @@ export function VotePanel({
       // Wallet rejections are a normal thing to do, not an error to shout about
       toast.error(msg.includes("User rejected") ? "Signature cancelled." : msg);
     } finally {
-      setSubmitting(false);
+      setPhase("idle");
     }
   }
 
@@ -208,23 +234,50 @@ export function VotePanel({
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Cast your vote</CardTitle>
         {meta && (
-          <p className="text-xs text-muted-foreground">{meta.description}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">{meta.description}</p>
         )}
       </CardHeader>
 
       <CardContent className="space-y-4">
+        <div role="status" className="space-y-2 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+          <p className="font-medium">
+            {!isConnected ? "Connect your wallet to check eligibility" :
+              eligibility.isFetching ? "Checking eligibility…" :
+              eligibility.data?.blocked || (power === 0 && !powerNote) ? "Not eligible for this proposal" :
+              powerNote ? "Eligibility unavailable" : "Eligible to vote"}
+          </p>
+          {isConnected && !eligibility.isFetching && (
+            <>
+              {eligible ? (
+                <p>Your voting power: <span className="tabular font-medium">{power!.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span> {powerUnit}</p>
+              ) : (
+                <p className="text-muted-foreground">{powerNote ?? (proposal.strategy === "verified-identity"
+                  ? "This address was not identity-verified at the proposal snapshot. Connect an address that was eligible when the snapshot was taken."
+                  : "This address held no voting power at the proposal snapshot. Connect a wallet that held eligible assets at that time.")}</p>
+              )}
+              {powerNote && (
+                <p className="text-muted-foreground">{eligibility.data?.blocked
+                  ? "Connect an address that was verified at the proposal snapshot."
+                  : "Try checking again. If this continues, contact the proposal organizer."}</p>
+              )}
+              {powerNote && (
+                <Button variant="outline" className="min-h-11" onClick={() => eligibility.refetch()}>Check again</Button>
+              )}
+            </>
+          )}
+          <p className="text-muted-foreground">Eligibility is based on the proposal snapshot. Changes after that snapshot do not add voting power.</p>
+        </div>
         {myVote && (
-          <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
-            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
-            <p className="text-muted-foreground">
-              You voted with{" "}
-              <span className="tabular font-medium text-foreground">
-                {Number(myVote.voting_power).toLocaleString(undefined, {
-                  maximumFractionDigits: 4,
-                })}
-              </span>{" "}
-              power. Your selection is shown below — voting again replaces it.
-            </p>
+          <div role="status" className="flex items-start gap-2 rounded-lg border border-status-passed/30 bg-status-passed/5 p-4 text-sm">
+            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-status-passed" />
+            <div className="min-w-0 space-y-2">
+              <p className="font-medium">Vote recorded</p>
+              <p className="break-words">{describeChoice(system, myVote.choice, choices)}</p>
+              <p className="text-muted-foreground">{myVote.signed_at ? "Signed" : "Recorded"}: {formatVotingDate(myVote.signed_at ? new Date(myVote.signed_at * 1000).toISOString() : myVote.voted_at ?? myVote.created_at)}</p>
+              {receipt ? <a className="inline-flex min-h-11 items-center text-primary underline underline-offset-4" href={receipt} target="_blank" rel="noreferrer">View IPFS receipt</a> :
+                <div className="space-y-1"><p className="text-muted-foreground">IPFS receipt not available yet. Your vote is recorded.</p><Button variant="outline" className="min-h-11" onClick={onVoted}>Refresh receipt</Button></div>}
+              <p className="text-muted-foreground">Voting again before the deadline replaces this ballot.</p>
+            </div>
           </div>
         )}
 
@@ -235,6 +288,7 @@ export function VotePanel({
               <button
                 key={i}
                 type="button"
+                aria-pressed={single === i + 1}
                 onClick={() => setSingle(i + 1)}
                 className={cn(
                   "flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition-colors",
@@ -259,6 +313,7 @@ export function VotePanel({
                 <button
                   key={i}
                   type="button"
+                  aria-pressed={on}
                   onClick={() =>
                     setApproved(
                       on
@@ -297,6 +352,7 @@ export function VotePanel({
                     {share}%
                   </span>
                   <input
+                    aria-label={`Shares for ${choice}`}
                     type="number"
                     min={0}
                     value={value}
@@ -337,7 +393,7 @@ export function VotePanel({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-7"
+                    className="size-11"
                     disabled={position === 0}
                     onClick={() => moveRank(position, -1)}
                     aria-label={`Move ${choices[choiceIndex - 1]} up`}
@@ -348,7 +404,7 @@ export function VotePanel({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-7"
+                    className="size-11"
                     disabled={position === ranking.length - 1}
                     onClick={() => moveRank(position, 1)}
                     aria-label={`Move ${choices[choiceIndex - 1]} down`}
@@ -362,7 +418,7 @@ export function VotePanel({
         )}
 
         <div className="space-y-1.5">
-          <Label htmlFor="reason" className="text-xs text-muted-foreground">
+          <Label htmlFor="reason" className="text-sm text-muted-foreground">
             Reason (optional)
           </Label>
           <Textarea
@@ -377,8 +433,8 @@ export function VotePanel({
         {isConnected ? (
           <Button
             onClick={review}
-            disabled={submitting || power === 0}
-            className="w-full"
+            disabled={submitting || !eligible}
+            className="min-h-11 w-full"
           >
             {myVote ? "Change vote" : "Review and sign"}
           </Button>
@@ -387,31 +443,14 @@ export function VotePanel({
         )}
 
         {isConnected && (
-          <div className="space-y-1 text-center text-xs text-muted-foreground">
-            {powerNote ? (
-              <p className="text-destructive">{powerNote}</p>
-            ) : power !== null ? (
-              <p>
-                Your voting power:{" "}
-                <span className="tabular font-medium text-foreground">
-                  {power.toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                </span>
-                {proposal.strategy === "verified-identity"
-                  ? power > 0
-                    ? " (identity verified)"
-                    : " (not identity verified)"
-                  : ` ${activeChain.nativeCurrency.symbol}`}
-              </p>
-            ) : null}
-            <p>
-              Signing costs no gas. Your signature proves the vote is yours.{" "}
-              <HowVotingWorks />
-            </p>
-          </div>
+          <p className="text-center text-sm leading-relaxed text-muted-foreground">
+            Signing costs no gas. Your signature proves the vote is yours.{" "}
+            <HowVotingWorks />
+          </p>
         )}
 
         {!isConnected && (
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-sm leading-relaxed text-muted-foreground">
             Voting is a signature, not a transaction. No gas, and nothing can
             be moved. <HowVotingWorks />
           </p>
@@ -427,7 +466,7 @@ export function VotePanel({
         this much power, and the fact that no transaction is being sent — is
         the difference between a considered confirmation and a leap of faith.
       */}
-      <Dialog open={confirming} onOpenChange={setConfirming}>
+      <Dialog open={confirming} onOpenChange={(open) => { if (!submitting) setConfirming(open); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Confirm your vote</DialogTitle>
@@ -452,7 +491,7 @@ export function VotePanel({
                   : "—"}
                 {proposal.strategy === "verified-identity"
                   ? ""
-                  : ` ${activeChain.nativeCurrency.symbol}`}
+                  : ` ${powerUnit}`}
               </dd>
             </div>
 
@@ -466,7 +505,7 @@ export function VotePanel({
             )}
           </dl>
 
-          <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">
+          <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
             <p className="flex gap-2">
               <PenLine className="mt-0.5 size-3.5 shrink-0 text-primary" />
               Your wallet will ask you to sign a message. This is not a
@@ -480,6 +519,9 @@ export function VotePanel({
             )}
           </div>
 
+          <p role="status" className="text-sm text-muted-foreground">
+            {phase === "wallet" ? "Confirm the signature request in your wallet." : phase === "saving" ? "Your signature was received. Recording your vote..." : ""}
+          </p>
           <DialogFooter>
             <Button
               variant="outline"
@@ -488,8 +530,8 @@ export function VotePanel({
             >
               Back
             </Button>
-            <Button onClick={submit} disabled={submitting}>
-              {submitting ? "Waiting for signature" : "Sign in wallet"}
+            <Button className="min-h-11" onClick={submit} disabled={submitting || !eligible}>
+              {phase === "wallet" ? "Waiting for wallet..." : phase === "saving" ? "Submitting vote..." : "Sign in wallet"}
             </Button>
           </DialogFooter>
         </DialogContent>

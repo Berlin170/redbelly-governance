@@ -28,6 +28,14 @@ export function timeLeft(endAt: string) {
   return `${mins}m left`;
 }
 
+/** Include the viewer's timezone wherever a voting deadline is displayed. */
+export function formatVotingDate(iso: string) {
+  return new Date(iso).toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit", timeZoneName: "short",
+  });
+}
+
 export function proposalState(startAt: string, endAt: string) {
   const now = Date.now();
   if (now < new Date(startAt).getTime()) return "pending" as const;

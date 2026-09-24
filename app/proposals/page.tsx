@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { ProposalRow, EmptyRows } from "@/components/proposal-row";
 import { useProfiles } from "@/lib/use-profiles";
@@ -88,9 +88,10 @@ function sortProposals(items: ProposalListItem[], key: SortKey) {
 }
 
 function ProposalsList() {
+  const router = useRouter();
   const params = useSearchParams();
   const query = (params.get("q") ?? "").trim().toLowerCase();
-  const { data: proposals, error, isLoading } = useProposals();
+  const { data: proposals, error, isLoading, isFetching, refetch } = useProposals();
   // Every author on the page resolved in one request, then handed to each row.
   const { data: profiles } = useProfiles((proposals ?? []).map((p) => p.author));
   // Which of these the connected wallet has already voted on. One request
@@ -143,6 +144,9 @@ function ProposalsList() {
       <div className="rounded-xl border border-destructive/40 bg-card p-5 text-sm">
         <p className="font-medium">Proposals could not be loaded.</p>
         <p className="mt-1 text-muted-foreground">{error.message}</p>
+        <Button variant="outline" className="mt-3 min-h-11" disabled={isFetching} onClick={() => refetch()}>
+          {isFetching ? "Retrying…" : "Try again"}
+        </Button>
       </div>
     );
   }
@@ -233,13 +237,26 @@ function ProposalsList() {
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         {visible.length === 0 ? (
-          <EmptyRows
+          <div>
+            <EmptyRows
             message={
               filtered
                 ? "No proposals match these filters."
                 : EMPTY[lane]
             }
-          />
+            />
+            {filtered && (
+              <div className="flex justify-center pb-6">
+                <Button variant="outline" className="min-h-11" onClick={() => {
+                  setLane("all");
+                  setOutcome("any");
+                  router.replace("/proposals");
+                }}>
+                  Clear filters
+                </Button>
+              </div>
+            )}
+          </div>
         ) : (
           visible.map((p) => <ProposalRow
                     key={p.id}

@@ -28,19 +28,19 @@ export function ProposalBody({ body }: { body: string }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    setTall(el.scrollHeight > COLLAPSE_AT + 120);
+    const measure = () => setTall(el.scrollHeight > (window.innerWidth < 1024 ? 192 : COLLAPSE_AT) + 40);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    window.addEventListener("resize", measure);
+    return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
   }, [body]);
 
   return (
     <div className="relative">
       <div
         ref={ref}
-        className="relative overflow-hidden text-sm leading-relaxed"
-        style={
-          tall && !open
-            ? { maxHeight: COLLAPSE_AT, transition: "max-height 320ms var(--ease-out)" }
-            : undefined
-        }
+        className={`relative overflow-hidden text-sm leading-relaxed ${tall && !open ? "max-h-48 lg:max-h-[560px]" : ""}`}
       >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
@@ -122,6 +122,7 @@ export function ProposalBody({ body }: { body: string }) {
           <Button
             variant="outline"
             size="sm"
+            className="min-h-11 text-sm"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
           >

@@ -24,9 +24,9 @@ const LINKS = [
 const CLAIMS = [
   {
     icon: ShieldCheck,
-    label: "Verified humans",
+    label: "Verified addresses",
     detail:
-      "Write access to Redbelly requires a Receptor credential backed by a biometric passport check, so an address here belongs to a person — and a one-person-one-vote election actually is one.",
+      "Identity voting gives each eligible verified address one vote. Multiple addresses may belong to the same person, so this does not establish one vote per unique person.",
   },
   {
     icon: PenLine,
@@ -38,7 +38,7 @@ const CLAIMS = [
     icon: FileCheck2,
     label: "Receipts on IPFS",
     detail:
-      "Every proposal and ballot is pinned to IPFS, so the signature can be re-checked by anyone without taking this server's word for it.",
+      "When an IPFS receipt is available, you can inspect the signed record independently. Receipt links appear on proposals and ballots after publication.",
   },
 ] as const;
 
@@ -48,10 +48,10 @@ function Claim({ claim }: { claim: (typeof CLAIMS)[number] }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="pressable inline-flex cursor-help items-center gap-1.5 rounded-full border border-border-strong/70 bg-background/60 px-2.5 py-1 text-xs font-medium backdrop-blur-sm hover:border-primary/45 hover:text-primary">
+        <button type="button" className="pressable inline-flex min-h-11 cursor-help items-center gap-1.5 rounded-full border border-border-strong/70 bg-background/60 px-2.5 py-1 text-sm font-medium backdrop-blur-sm hover:border-primary/45 hover:text-primary">
           <Icon className="size-3.5 shrink-0 text-primary" />
           {label}
-        </span>
+        </button>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs leading-relaxed">
         {detail}
@@ -151,7 +151,7 @@ export function SpaceHeader() {
                     rel="noreferrer"
                     title={label}
                     aria-label={label}
-                    className="pressable grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="pressable grid size-11 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     {Icon ? (
                       <Icon className="size-4" />

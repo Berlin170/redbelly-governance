@@ -176,11 +176,11 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         >
           <span className="flex items-center gap-1.5 text-xs font-medium">
             <ShieldCheck className="size-3.5 shrink-0 text-primary" />
-            One person, one vote
+            One verified address, one vote
           </span>
           <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">
-            Every address here clears Redbelly&rsquo;s passport-backed identity
-            check.
+            Identity voting counts verified addresses. One person may hold
+            more than one.
           </span>
         </Link>
       </div>

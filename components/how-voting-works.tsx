@@ -21,7 +21,7 @@ const STEPS = [
   {
     icon: ShieldCheck,
     title: "Your voting power is read",
-    body: "Depending on the proposal, that is your RBNT balance at the snapshot block, or simply one vote because Redbelly already knows you are a distinct person.",
+    body: "Depending on the proposal, voting power comes from eligible assets at the snapshot block or one vote per verified address. Verified addresses are not necessarily unique people.",
   },
   {
     icon: PenLine,
@@ -30,8 +30,8 @@ const STEPS = [
   },
   {
     icon: FileCheck2,
-    title: "The ballot is pinned to IPFS",
-    body: "Your signed payload gets its own record, so anyone can re-check the signature later without taking this server's word for anything.",
+    title: "Your vote is recorded",
+    body: "The portal records your signed ballot. When its IPFS receipt is published, a link lets you inspect the signed payload independently. An unavailable receipt does not mean your vote failed.",
   },
 ] as const;
 

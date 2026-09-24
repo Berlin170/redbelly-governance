@@ -25,6 +25,7 @@ import {
   receiptUrl,
   shortProposalId,
   timeLeft,
+  formatVotingDate,
 } from "@/lib/utils";
 import { explorerAddress } from "@/lib/chains";
 import { outcomeOf } from "@/lib/outcome";
@@ -47,13 +48,19 @@ export default function ProposalPage({
   const { id } = use(params);
   const [data, setData] = useState<PayloadShape | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [, tick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => tick((n) => n + 1), 15_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const load = useCallback(() => {
     fetch(`/api/proposals/${id}`)
       .then((r) => r.json())
       .then((json) => {
         if (json.error) setError(json.error);
-        else setData(json);
+        else { setData(json); setError(null); }
       })
       .catch(() => setError("Could not reach the server."));
   }, [id]);
@@ -123,8 +130,8 @@ export default function ProposalPage({
    */
   const peoplesNote = useMemo(() => {
     const base =
-      "Advisory, and decides nothing. Every verified voter counts once here, " +
-      "however much they hold.";
+      "Advisory, and decides nothing. Every verified address counts once here, " +
+      "regardless of holdings. Multiple addresses may belong to one person.";
     if (!data || !peoples) return base;
 
     const named = (n: number | null) =>
@@ -136,10 +143,10 @@ export default function ProposalPage({
     return byPower === byPerson
       ? `${base} It agrees with the weighted count: ${byPower} leads both.`
       : `${base} It disagrees with the weighted count, which has ${byPower} ` +
-          `ahead while the people here prefer ${byPerson}.`;
+          `ahead while the verified-address count favors ${byPerson}.`;
   }, [data, peoples]);
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="rounded-xl border border-destructive/40 bg-card p-6 text-sm">
         <p className="font-medium">This proposal could not be loaded.</p>
@@ -266,27 +273,27 @@ export default function ProposalPage({
         )}
       </div>
 
-      {/*
-        On a phone the rail comes first.
+      {error && <p role="alert" className="text-sm text-destructive">Could not refresh this proposal. Showing the last loaded results. <button className="underline" onClick={load}>Try again</button></p>}
+      <div className="rounded-xl border border-border bg-card p-4 text-sm">
+        <p className="font-medium">{state === "pending" ? "Voting opens" : state === "closed" ? "Voting closed" : `Voting closes · ${timeLeft(proposal.end_at)}`}</p>
+        <time dateTime={state === "pending" ? proposal.start_at : proposal.end_at} className="mt-1 block text-muted-foreground">
+          {formatVotingDate(state === "pending" ? proposal.start_at : proposal.end_at)}
+        </time>
+      </div>
 
-        The old order put the whole proposal body — sometimes thousands of
-        pixels of imported markdown — and then the full ballot list above the
-        one control the visitor came here to use. Ordering is a presentation
-        concern, so it is done with `order` rather than by duplicating the
-        panels or moving them in the DOM, and the reading order on desktop is
-        unchanged.
-      */}
+      {/* Mobile: proposal preview, ballot, then voter history. */}
       <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <div className="order-2 min-w-0 space-y-5 lg:order-1">
+        <div className="contents lg:order-1 lg:block lg:min-w-0 lg:space-y-5">
           {proposal.body && (
-            <Card>
+            <Card className="order-1 min-w-0">
               <CardContent className="p-5">
+                <h2 className="mb-3 text-sm font-semibold lg:hidden">What you’re voting on</h2>
                 <ProposalBody body={proposal.body} />
               </CardContent>
             </Card>
           )}
 
-          <Tabs defaultValue="votes">
+          <Tabs defaultValue="votes" className="order-3 min-w-0">
             <TabsList>
               <TabsTrigger value="votes">
                 Votes
@@ -312,11 +319,11 @@ export default function ProposalPage({
                   <Row label="Strategy" value={proposal.strategy} />
                   <Row
                     label="Opens"
-                    value={new Date(proposal.start_at).toLocaleString()}
+                    value={formatVotingDate(proposal.start_at)}
                   />
                   <Row
                     label="Closes"
-                    value={new Date(proposal.end_at).toLocaleString()}
+                    value={formatVotingDate(proposal.end_at)}
                   />
                   {proposal.snapshot_block && (
                     <Row
@@ -361,7 +368,7 @@ export default function ProposalPage({
           </Tabs>
         </div>
 
-        <div className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-20">
+        <div className="order-2 min-w-0 space-y-4 lg:sticky lg:top-20">
           {state === "active" && (
             <VotePanel proposal={proposal} votes={votes} onVoted={onVoted} />
           )}
@@ -379,7 +386,7 @@ export default function ProposalPage({
               choices={proposal.choices}
               quorum={0}
               state={state}
-              title="One vote per person"
+              title="One vote per verified address"
               note={peoplesNote}
             />
           )}

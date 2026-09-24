@@ -286,7 +286,7 @@ export default function CreatePage() {
             )}
             {!identityAvailable && (
               <p className="text-xs text-status-pending">
-                One person, one vote is unavailable on {activeChain.name}:
+                Verified-address voting is unavailable on {activeChain.name}:
                 no Redbelly access contract is deployed there. Set
                 NEXT_PUBLIC_IDENTITY_REGISTRY to enable it.
               </p>
@@ -314,7 +314,7 @@ export default function CreatePage() {
             {strategyMeta && (
               <p className="text-xs text-muted-foreground">
                 {system === "one-person-one-vote"
-                  ? "One person, one vote requires verified identity."
+                  ? "One verified address, one vote requires verified identity."
                   : strategyMeta.hint}
               </p>
             )}

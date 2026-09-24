@@ -150,7 +150,7 @@ export function ProposalRow({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
             <h3 className="display min-w-0 text-[0.9375rem] leading-snug transition-colors group-hover:text-primary">
               {item.title}
             </h3>
