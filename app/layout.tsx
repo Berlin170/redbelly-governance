@@ -7,6 +7,7 @@ import { Providers } from "./providers";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppToaster } from "@/components/app-toaster";
 import { TopBar } from "@/components/top-bar";
+import { KycNotice } from "@/components/kyc-notice";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -73,6 +74,7 @@ export default function RootLayout({
               </Suspense>
 
               <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+                <KycNotice />
                 {children}
               </main>
             </div>

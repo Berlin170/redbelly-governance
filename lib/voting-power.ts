@@ -296,16 +296,19 @@ async function verifiedIdentityPower(
     // extender-claimed address took the vote off two addresses belonging to a
     // member who had already voted in earlier gated proposals with them. So
     // ask the KYC set directly, and only rule the address a company when it
-    // answers false. Unreadable counts as false: see `passedKyc`.
-    return (await passedKyc(registry, address, at)) === true ? 1 : 0;
+    // answers false. An unreadable result must not be described as missing KYC.
+    const kyc = await passedKyc(registry, address, at);
+    if (kyc === null) throw new Error("Identity verification status is temporarily unavailable.");
+    return kyc ? 1 : 0;
   }
 
-  const { data } = await supabaseAdmin()
+  const { data, error } = await supabaseAdmin()
     .from("verified_addresses")
     .select("address")
     .eq("address", voter.toLowerCase())
     .maybeSingle();
 
+  if (error) throw new Error("Identity verification status is temporarily unavailable.");
   return data ? 1 : 0;
 }
 

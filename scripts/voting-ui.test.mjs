@@ -70,6 +70,7 @@ try {
         if (url.pathname === "/api/space") json = { space: { id: "redbelly", name: "Redbelly DAO", about: "Community governance", admins: [], members: [], followers_count: 0 }, stats: { proposalCount: 3, voteCount: 0, activeCount: 1, voterCount: 0, avgTurnout: 0, closedCount: 1 } };
         else if (url.pathname === "/api/proposals") json = { proposals: [proposal, upcoming, closed] };
         else if (url.pathname.startsWith("/api/proposals/")) json = { proposal, votes: vote ? [vote] : [], results };
+        else if (url.pathname === "/api/identity") json = { verified: true, chainId: 151 };
         else if (url.pathname === "/api/profile") json = { profiles: {} };
         else if (url.pathname === "/api/power") {
           if (powerMode === "wait") await new Promise((resolve) => { releasePower = resolve; });
