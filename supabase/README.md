@@ -23,6 +23,7 @@ Run `schema.sql` first, then `migrations/` in numeric order.
 | `migrations/008_ipfs_receipts.sql` | `signed_at` on proposals, receipt columns | yes |
 | `migrations/009_avatar_uploads_rls.sql` | RLS on `avatar_uploads`, no policy | yes |
 | `migrations/010_identity_quorum.sql` | `proposals.identity_quorum` | yes |
+| `migrations/011_proposal_screening.sql` | `proposal_screenings`, `proposals.screening_id` | yes |
 
 Everything through 010 is live in production. Nothing here is taken on trust:
 each was verified by reading something that only exists if the migration ran.

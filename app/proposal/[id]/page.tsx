@@ -8,6 +8,7 @@ import { VotePanel } from "@/components/vote-panel";
 import { ResultsPanel } from "@/components/results-panel";
 import { VotersTable } from "@/components/voters-table";
 import { ProposalBody } from "@/components/proposal-body";
+import { ScreeningChecklist } from "@/components/screening-checklist";
 import { StatusBadge } from "@/components/status-badge";
 import { ShareButton } from "@/components/share-button";
 import { AddressAvatar } from "@/components/address-avatar";
@@ -33,11 +34,13 @@ import { tallyByIdentity } from "@/lib/voting";
 import { useProfile, displayName } from "@/lib/use-profiles";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import type { Proposal, TallyResult, Vote } from "@/lib/types";
+import type { ScreeningResult } from "@/lib/screening-criteria";
 
 interface PayloadShape {
   proposal: Proposal;
   votes: Vote[];
   results: TallyResult;
+  screening?: ScreeningResult | null;
 }
 
 export default function ProposalPage({
@@ -364,6 +367,24 @@ export default function ProposalPage({
                   )}
                 </CardContent>
               </Card>
+
+              {data.screening && (
+                <Card className="mt-4">
+                  <CardContent className="space-y-3 p-5">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold">11-point proposal check</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Passed before publishing
+                        {data.screening.created_at &&
+                          ` on ${formatVotingDate(data.screening.created_at)}`}
+                        {" "}· checked by {data.screening.model}
+                        {!data.screening.requests_funds && " · asks for no funds"}
+                      </p>
+                    </div>
+                    <ScreeningChecklist result={data.screening} />
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
         </div>

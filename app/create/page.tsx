@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAccount, useBalance, useSignTypedData } from "wagmi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
 import { PageHead } from "@/components/page-head";
 import { ConnectWallet } from "@/components/connect-wallet";
 import { ProposalBody } from "@/components/proposal-body";
+import { ScreeningChecklist } from "@/components/screening-checklist";
 import { useSpace } from "@/components/space-provider";
 import { domain, proposalTypes } from "@/lib/eip712";
 import { VOTING_SYSTEMS } from "@/lib/voting";
@@ -43,7 +44,8 @@ import { PROPOSAL_THRESHOLD } from "@/lib/limits";
  */
 const IDENTITY_REGISTRY = accessContract();
 import type { VotingStrategy, VotingSystem } from "@/lib/types";
-import { Eye, Plus, ShieldCheck, X } from "lucide-react";
+import type { ScreeningResult } from "@/lib/screening-criteria";
+import { ClipboardCheck, Eye, Plus, ShieldCheck, X } from "lucide-react";
 
 const STRATEGIES: { value: VotingStrategy; label: string; hint: string }[] = [
   {
@@ -103,6 +105,53 @@ export default function CreatePage() {
   const [days, setDays] = useState("5");
   const [submitting, setSubmitting] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+
+  // The 11-point check. A pass belongs to the exact text it read, so it is
+  // kept with that text and goes stale the moment the title or body changes;
+  // the API matches by hash and would refuse a stale pass anyway, and saying
+  // so here beats saying so after the wallet prompt.
+  const [screeningOn, setScreeningOn] = useState(false);
+  const [screening, setScreening] = useState<{ text: string; result: ScreeningResult } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const draftText = JSON.stringify([title.trim(), body.trim()]);
+  const screeningStale = !!screening && screening.text !== draftText;
+  const screeningPassed = !!screening && !screeningStale && screening.result.passed;
+  const blockedByScreening = screeningOn && !isAdmin && !screeningPassed;
+
+  useEffect(() => {
+    fetch("/api/proposals/screen")
+      .then((r) => r.json())
+      .then((json) => setScreeningOn(Boolean(json.enabled)))
+      .catch(() => setScreeningOn(false));
+  }, []);
+
+  async function runCheck() {
+    if (!title.trim()) return toast.error("Give the proposal a title.");
+    if (!body.trim()) return toast.error("Write the proposal before checking it.");
+
+    const text = draftText;
+    setChecking(true);
+    try {
+      const res = await fetch("/api/proposals/screen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          body: body.trim(),
+          space: process.env.NEXT_PUBLIC_SPACE_ID ?? "redbelly-dao",
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "The check could not be run.");
+      setScreening({ text, result: json.screening });
+      if (json.screening.passed) toast.success("All points passed. You can publish.");
+      else toast.error("Some points are flagged. Fix them and check again.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "The check could not be run.");
+    } finally {
+      setChecking(false);
+    }
+  }
 
   const systemMeta = VOTING_SYSTEMS.find((s) => s.value === system);
 
@@ -409,6 +458,64 @@ export default function CreatePage() {
             </div>
           )}
 
+          {screeningOn && (
+            <div className="space-y-3 rounded-lg border border-border bg-card p-3.5">
+              <div className="flex items-start gap-3">
+                <ClipboardCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm font-medium">11-point proposal check</p>
+                  <p className="text-xs text-muted-foreground">
+                    Every proposal is checked by AI against the DAO&apos;s
+                    review checklist and needs a green tick on each point
+                    before it can go to a vote. Proposals that ask for no funds
+                    are only held to the points that apply.
+                  </p>
+                </div>
+              </div>
+
+              {screening && (
+                <>
+                  <p
+                    className={`text-sm font-medium ${
+                      screeningStale
+                        ? "text-muted-foreground"
+                        : screening.result.passed
+                          ? "text-status-passed"
+                          : "text-status-rejected"
+                    }`}
+                  >
+                    {screeningStale
+                      ? "You edited the proposal after this check. Check it again before publishing."
+                      : screening.result.passed
+                        ? "Passed. This exact text can be published."
+                        : "Needs changes. Fix the flagged points and check again."}
+                  </p>
+                  <ScreeningChecklist result={screening.result} />
+                </>
+              )}
+
+              <Button
+                variant={screeningPassed ? "outline" : "default"}
+                onClick={runCheck}
+                disabled={checking || !title.trim() || !body.trim()}
+                className="w-full"
+              >
+                {checking
+                  ? "Checking, this can take a minute"
+                  : screening
+                    ? "Check again"
+                    : "Run the check"}
+              </Button>
+
+              {isAdmin && !screeningPassed && (
+                <p className="text-xs text-muted-foreground">
+                  You are a space admin, so you can publish without a pass.
+                  Use it only when the check has got a proposal wrong.
+                </p>
+              )}
+            </div>
+          )}
+
           {isConnected ? (
             <div className="space-y-2">
               <div className="flex gap-2">
@@ -429,7 +536,7 @@ export default function CreatePage() {
                 </Button>
                 <Button
                   onClick={submit}
-                  disabled={submitting || belowThreshold}
+                  disabled={submitting || belowThreshold || blockedByScreening}
                   className="flex-1"
                 >
                   {submitting ? "Waiting for signature" : "Sign and publish"}
@@ -536,7 +643,7 @@ export default function CreatePage() {
                 setPreviewing(false);
                 submit();
               }}
-              disabled={submitting || belowThreshold}
+              disabled={submitting || belowThreshold || blockedByScreening}
             >
               Sign and publish
             </Button>

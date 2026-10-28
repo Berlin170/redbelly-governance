@@ -1,28 +1,12 @@
-import { createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isMissingTable } from "@/lib/pg-errors";
 import { LIMITS, dayAgo } from "@/lib/limits";
+import { callerId } from "@/lib/caller";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 512 * 1024;
-
-/**
- * Who is calling, as a number rather than a name.
- *
- * A rolling count has to recognise a repeat caller, which a keyed digest does,
- * and nothing beyond that needs to know whose address it was. Keying it means
- * the stored value cannot be walked back to an IP by anyone who later reads
- * the table, and salting it with a server-only secret means it cannot be
- * confirmed by guessing either.
- */
-function callerId(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = forwarded || req.headers.get("x-real-ip") || "unknown";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  return createHmac("sha256", key).update(ip).digest("hex");
-}
 
 /**
  * Magic bytes, not the Content-Type header.

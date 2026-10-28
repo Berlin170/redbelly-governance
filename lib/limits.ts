@@ -33,6 +33,12 @@ export const LIMITS = {
    * High enough that changing your mind about a picture never hits it.
    */
   avatarsPerCallerPerDay: 20,
+  /**
+   * Runs of the 11-point check per caller over a rolling 24h. Each run is a
+   * paid model call behind an endpoint that takes no signature. An author
+   * fixing flags and re-checking needs a handful; thirty is generous.
+   */
+  screeningsPerCallerPerDay: 30,
 } as const;
 
 /**

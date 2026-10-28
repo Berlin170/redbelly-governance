@@ -89,6 +89,12 @@ export interface Proposal {
    * payload cannot be reconstructed proves nothing.
    */
   signed_at?: number | null;
+  /**
+   * The 11-point check this proposal passed before publishing. Null on
+   * imported history, on anything published before migration 011, and on a
+   * proposal a space admin published without a pass.
+   */
+  screening_id?: string | null;
   results_hash: string | null;
   anchor_tx: string | null;
 

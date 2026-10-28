@@ -23,5 +23,17 @@ export async function GET(
 
   const results = resultsFor(proposal as Proposal, (votes ?? []) as Vote[]);
 
-  return NextResponse.json({ proposal, votes: votes ?? [], results });
+  // The 11-point check this proposal passed, published beside it so a reader
+  // can see what was checked and why it passed. `caller` is never selected.
+  let screening = null;
+  if (proposal.screening_id) {
+    const { data } = await db
+      .from("proposal_screenings")
+      .select("id, passed, requests_funds, criteria, model, created_at")
+      .eq("id", proposal.screening_id)
+      .maybeSingle();
+    screening = data;
+  }
+
+  return NextResponse.json({ proposal, votes: votes ?? [], results, screening });
 }

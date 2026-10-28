@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { verifyTypedData, getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase";
-import { isMissingColumn } from "@/lib/pg-errors";
+import { isMissingColumn, isMissingTable } from "@/lib/pg-errors";
+import { findPassingScreening, screeningEnabled } from "@/lib/screening";
 import { pinAndRecord } from "@/lib/ipfs";
 import { proposalReceipt } from "@/lib/receipts";
 import { domain, proposalTypes } from "@/lib/eip712";
@@ -257,21 +258,53 @@ export async function POST(req: NextRequest) {
       snapshotBlock = null; // RPC unreachable — fall back to live balances
     }
 
+    const { data: spaceRow } = await db0
+      .from("spaces")
+      .select("admins")
+      .eq("id", message.space)
+      .maybeSingle();
+    const isAdmin = (spaceRow?.admins ?? [])
+      .map((a: string) => a.toLowerCase())
+      .includes(message.from.toLowerCase());
+
+    // The 11-point check. The text being signed has to be text that passed,
+    // matched by hash, so a draft cannot pass and then be edited before it
+    // goes to a vote. Space admins may publish without a pass: that is the
+    // manual override for a check that got a proposal wrong, and it shows,
+    // because such a proposal carries no screening_id.
+    //
+    // A missing table turns the gate off rather than closing the portal: with
+    // nowhere to record a pass, nobody could ever earn one.
+    let screeningId: string | null = null;
+    let screeningGate = screeningEnabled();
+    if (screeningGate) {
+      try {
+        const pass = await findPassingScreening(db0, message.space, message.title, message.body);
+        screeningId = pass?.id ?? null;
+      } catch (err) {
+        if (!isMissingTable(err as { code?: string; message?: string })) throw err;
+        screeningGate = false;
+        console.warn(
+          "[proposals] proposal_screenings is missing — the 11-point check is " +
+            "OFF until supabase/migrations/011_proposal_screening.sql has been run."
+        );
+      }
+      if (screeningGate && !screeningId && !isAdmin) {
+        return NextResponse.json(
+          {
+            error:
+              "This proposal has not passed the 11-point check. Run the check, " +
+              "fix any flags, and publish the exact text that passed.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Proposal validation: hold a stake in the space, or be an admin of it.
     // Checked at the snapshot block like everything else, so an address cannot
     // borrow the threshold for the length of one transaction and hand it back.
     if (PROPOSAL_THRESHOLD > 0) {
-      const { data: space } = await db0
-        .from("spaces")
-        .select("admins")
-        .eq("id", message.space)
-        .maybeSingle();
-
-      const admins: string[] = (space?.admins ?? []).map((a: string) =>
-        a.toLowerCase()
-      );
-      const isAdmin = admins.includes(message.from.toLowerCase());
-
       if (!isAdmin) {
         const held = await getVotingPower({
           voter: message.from,
@@ -317,9 +350,18 @@ export async function POST(req: NextRequest) {
       // signature on a proposal is a string nobody — including us — can check.
       signed_at: Number(message.timestamp),
     };
+    if (screeningId) row.screening_id = screeningId;
 
     const db = supabaseAdmin();
     let { data, error } = await db.from("proposals").insert(row).select().single();
+
+    // screening_id (011) is only sent when there is one, and there can only be
+    // one once 011's table exists, so this is the rare deployment that ran the
+    // table half of 011 and not the column half.
+    if (error && isMissingColumn(error) && /screening_id/.test(error.message ?? "")) {
+      delete row.screening_id;
+      ({ data, error } = await db.from("proposals").insert(row).select().single());
+    }
 
     // Two columns here arrive by hand-run migration, and this deployment may
     // be ahead of the SQL editor on either. Each is dropped in turn rather
