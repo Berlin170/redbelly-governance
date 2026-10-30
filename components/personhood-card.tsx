@@ -26,7 +26,9 @@ const SelfQRcodeWrapper = dynamic(
 const SPACE = process.env.NEXT_PUBLIC_SPACE_ID ?? "redbelly-dao";
 const APP_NAME = process.env.NEXT_PUBLIC_SPACE_NAME ?? "Redbelly DAO";
 
-const PLAY_STORE = "https://play.google.com/store/apps/details?id=com.proofofpassportapp";
+// Self's own site, not one store: members are on Android and iPhone alike,
+// and the site sends each to the right app store.
+const GET_SELF = "https://self.xyz";
 
 interface Status {
   enabled: boolean;
@@ -144,10 +146,10 @@ export function PersonhoodCard() {
       <div className="space-y-1">
         <p className="text-sm font-medium">Verify you are one person</p>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Scan your passport, chip national ID card (Pakistan NIC works) or
-          Aadhaar in the free Self app. Your details stay on your phone: the
-          portal only learns that this document has not verified another
-          wallet. One document, one wallet.
+          Scan your passport or national ID card in the free Self app, which
+          supports documents from most countries. Your details stay on your
+          phone: the portal only learns that this document has not verified
+          another wallet. One document, one wallet.
         </p>
       </div>
 
@@ -164,12 +166,12 @@ export function PersonhoodCard() {
             {starting ? "Waiting for signature" : "Sign and verify with Self"}
           </Button>
           <a
-            href={PLAY_STORE}
+            href={GET_SELF}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            Get Self on Google Play <ExternalLink className="size-3" />
+            Get the Self app <ExternalLink className="size-3" />
           </a>
         </div>
       ) : (
