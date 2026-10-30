@@ -119,6 +119,7 @@ async function sweepProposals(db: ReturnType<typeof supabaseAdmin>) {
         snapshot_block: p.snapshot_block,
         quorum: Number(p.quorum ?? 0),
         identity_quorum: Number(p.identity_quorum ?? 0),
+        require_unique: !!p.require_unique,
         created_at: p.created_at,
       }),
       out

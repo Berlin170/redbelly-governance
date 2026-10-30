@@ -113,6 +113,12 @@ export function proposalReceipt(
     snapshot_block?: number | null;
     quorum?: number | null;
     identity_quorum?: number | null;
+    /**
+     * Strict one person, one vote (migration 012). Unsigned, like the
+     * quorums, but a rebuild that dropped it would reopen a strict vote to
+     * every verified wallet, so the receipt carries it.
+     */
+    require_unique?: boolean;
     created_at?: string | null;
   }
 ): Receipt {

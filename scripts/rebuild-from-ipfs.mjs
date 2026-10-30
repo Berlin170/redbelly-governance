@@ -182,6 +182,9 @@ function proposalRow(r, cid) {
     require_verified: !!m.requireVerified,
     snapshot_block: r.meta.snapshot_block ?? null,
     quorum: r.meta.quorum ?? 0,
+    identity_quorum: r.meta.identity_quorum ?? 0,
+    // Older receipts predate migration 012 and were never strict.
+    require_unique: !!r.meta.require_unique,
     start_at: new Date(Number(m.start) * 1000).toISOString(),
     end_at: new Date(Number(m.end) * 1000).toISOString(),
     created_at: r.meta.created_at ?? new Date(Number(m.timestamp) * 1000).toISOString(),

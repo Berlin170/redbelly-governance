@@ -474,6 +474,7 @@ export async function POST(req: NextRequest) {
             snapshot_block: snapshotBlock,
             quorum: Number(message.quorum ?? 0),
             identity_quorum: identityQuorum,
+            require_unique: requireUnique,
             created_at: created.created_at ?? null,
           }
         ),
