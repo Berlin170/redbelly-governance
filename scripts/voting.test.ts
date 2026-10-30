@@ -320,6 +320,28 @@ console.log("\ntallyByIdentity");
   );
 }
 
+{
+  // One Self identity behind two wallets. Bindings are one to one, so this
+  // only happens if a binding moves mid-vote; the database refuses it, and the
+  // tally must agree with the database rather than count two people.
+  const a = { ...ballot(1, 1, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab1"), identity_key: "bind-1", signed_at: 1_000 };
+  const b = { ...ballot(1, 2, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab2"), identity_key: "bind-1", signed_at: 2_000 };
+  const c = ballot(1, 1, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab3");
+
+  const r = tallyByIdentity("single-choice", [a, b, c], 2);
+  check("two wallets, one Self identity, count once", r.identityCount, 2);
+  check("and the later ballot is the one that counts", r.scores, [1, 1]);
+  check("bound ballots are reported", tally("single-choice", [a, c], 2).selfVerifiedCount, 1);
+
+  // A binding id must never be mistaken for an address that happens to match.
+  const clash = { ...ballot(1, 1, "bind-1"), identity_key: null };
+  check(
+    "a binding id and an address never collide",
+    tally("single-choice", [a, clash], 2).identityCount,
+    2
+  );
+}
+
 console.log(
   failures === 0
     ? `\n${checks} checks passed.\n`

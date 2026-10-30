@@ -24,6 +24,7 @@ Run `schema.sql` first, then `migrations/` in numeric order.
 | `migrations/009_avatar_uploads_rls.sql` | RLS on `avatar_uploads`, no policy | yes |
 | `migrations/010_identity_quorum.sql` | `proposals.identity_quorum` | yes |
 | `migrations/011_proposal_screening.sql` | `proposal_screenings`, `proposals.screening_id` | yes |
+| `migrations/012_personhood.sql` | Self sessions and bindings, `votes.identity_key`, `proposals.require_unique` | no |
 
 Everything through 011 is live in production. Nothing here is taken on trust:
 each was verified by reading something that only exists if the migration ran.
@@ -64,7 +65,7 @@ reference to them by number.
 
 ## Adding one
 
-Next number is `012`. Put it in `migrations/`, make it idempotent
+Next number is `013`. Put it in `migrations/`, make it idempotent
 (`add column if not exists`, `create table if not exists`) so a re-run is
 harmless, and make the code tolerate its absence until it is applied —
 `isMissingColumn` in `lib/pg-errors.ts` is how the proposal route degrades to

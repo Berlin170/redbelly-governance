@@ -33,6 +33,7 @@ import { domain, proposalTypes } from "@/lib/eip712";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import { accessContract, activeChain } from "@/lib/chains";
 import { ADDRESSES_PER_CREDENTIAL } from "@/lib/identity";
+import { personhoodEnabled } from "@/lib/personhood-config";
 import { PROPOSAL_THRESHOLD } from "@/lib/limits";
 
 /**
@@ -102,6 +103,7 @@ export default function CreatePage() {
   const [tokenAddress, setTokenAddress] = useState("");
   const [quorum, setQuorum] = useState("0");
   const [identityQuorum, setIdentityQuorum] = useState("0");
+  const [requireUnique, setRequireUnique] = useState(false);
   const [days, setDays] = useState("5");
   const [submitting, setSubmitting] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -222,6 +224,7 @@ export default function CreatePage() {
             tokenAddress: tokenAddress.trim(),
             quorum,
             identityQuorum,
+            requireUnique: requireUnique && identityAvailable,
           },
           signature,
         }),
@@ -456,6 +459,30 @@ export default function CreatePage() {
                 )}
               </p>
             </div>
+          )}
+
+          {/* Strict mode. Offered only where Self is set up and ballots are
+              already identity-gated; the server refuses it otherwise. */}
+          {identityAvailable && personhoodEnabled && (
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 shrink-0 accent-primary"
+                checked={requireUnique}
+                onChange={(e) => setRequireUnique(e.target.checked)}
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium">
+                  One person, one vote (Self-verified)
+                </span>
+                <span className="block text-xs leading-relaxed text-muted-foreground">
+                  Only wallets verified as one person with the Self app before
+                  this proposal opens can vote. Stops one member voting from
+                  several wallets, but members who have not verified yet are
+                  left out, so keep it for votes where that matters.
+                </span>
+              </span>
+            </label>
           )}
 
           {screeningOn && (

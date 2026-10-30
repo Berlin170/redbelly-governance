@@ -61,6 +61,40 @@ export const profileTypes = {
   ],
 } as const;
 
+/**
+ * "This wallet is mine, and I am about to prove who I am with Self."
+ *
+ * Signed before the QR code is shown, because the Self proof on its own says
+ * nothing about wallets: whoever displays the code chooses which session it
+ * belongs to. Without this signature anyone could open a session for a
+ * stranger's address and spend their own document on it, leaving the real
+ * owner unable to bind theirs.
+ */
+export const personhoodTypes = {
+  Personhood: [
+    { name: "from", type: "address" },
+    { name: "space", type: "string" },
+    { name: "timestamp", type: "uint64" },
+  ],
+} as const;
+
+export interface PersonhoodMessage {
+  from: `0x${string}`;
+  space: string;
+  timestamp: bigint;
+}
+
+export function buildPersonhoodMessage(params: {
+  from: `0x${string}`;
+  space: string;
+}): PersonhoodMessage {
+  return {
+    from: params.from,
+    space: params.space,
+    timestamp: BigInt(Math.floor(Date.now() / 1000)),
+  };
+}
+
 export interface ProfileMessage {
   from: `0x${string}`;
   displayName: string;

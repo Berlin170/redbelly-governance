@@ -179,6 +179,19 @@ export function ResultsPanel({
           <span className="tabular">{results.voterCount}</span>
         </div>
 
+        {/* Only once someone has done it, so a portal without Self set up
+            reads exactly as it did before. */}
+        {(results.selfVerifiedCount ?? 0) > 0 && (
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="shrink-0 text-muted-foreground">
+              Verified as one person
+            </span>
+            <span className="tabular text-right">
+              {results.selfVerifiedCount} of {results.voterCount}
+            </span>
+          </div>
+        )}
+
         {/* Shown above the power quorum deliberately. Where a proposal asks
             both, how many people turned up is the harder threshold to reach
             and the more informative one to read first. */}

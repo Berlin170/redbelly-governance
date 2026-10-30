@@ -12,6 +12,7 @@ import {
   MAX_SNAPSHOT_DRIFT_SECONDS,
 } from "@/lib/voting-power";
 import { validateChoice } from "@/lib/voting";
+import { bindingFor, boundInTime, type PersonhoodBinding } from "@/lib/personhood";
 import { LIMITS, MAX_CLOCK_SKEW_SECONDS } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
@@ -179,6 +180,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Which person, if any, is behind this wallet. Asked on every ballot, not
+    // only on strict proposals, so results can show how much of any vote was
+    // cast one per person. Only a strict proposal depends on the answer, so
+    // only a strict proposal is refused when the question cannot be asked.
+    let binding: PersonhoodBinding | null = null;
+    try {
+      const lookup = await bindingFor(voter);
+      if (lookup.state === "bound") binding = lookup.binding;
+    } catch (err) {
+      if (proposal.require_unique) {
+        const msg = err instanceof Error ? err.message : "Verification status unavailable.";
+        return NextResponse.json({ error: msg }, { status: 503 });
+      }
+      console.warn("[votes] personhood lookup failed; counting by address:", err);
+    }
+
+    if (proposal.require_unique && (!binding || !boundInTime(binding, proposal))) {
+      return NextResponse.json(
+        {
+          error: binding
+            ? "This proposal counts one vote per person, and this wallet was " +
+              "verified with Self after the proposal opened. It can vote on " +
+              "the next one."
+            : "This proposal counts one vote per person. Verify this wallet " +
+              "with Self from your profile first. It applies to proposals " +
+              "created after you verify.",
+        },
+        { status: 403 }
+      );
+    }
+
     const choice = JSON.parse(message.choice);
     validateChoice(proposal.voting_system, choice, proposal.choices.length);
 
@@ -240,12 +272,27 @@ export async function POST(req: NextRequest) {
       // below fills it back in moments later.
       source_receipt: null,
     };
+    // Sent only for bound wallets, so a deployment without migration 012
+    // writes exactly the row it always has.
+    if (binding) row.identity_key = binding.id;
 
     let { data, error } = await db
       .from("votes")
       .upsert(row, { onConflict: "proposal_id,voter" })
       .select()
       .single();
+
+    // identity_key is only ever sent when a binding exists, and a binding can
+    // only exist once 012 has run, so this is a half-applied 012. Count the
+    // ballot by address rather than refuse it.
+    if (error && isMissingColumn(error) && /identity_key/.test(error.message ?? "")) {
+      delete row.identity_key;
+      ({ data, error } = await db
+        .from("votes")
+        .upsert(row, { onConflict: "proposal_id,voter" })
+        .select()
+        .single());
+    }
 
     // source_receipt arrived with migration 003, and a deployment can still be
     // ahead of its database. Receipts are a second copy of the record; being
@@ -261,6 +308,15 @@ export async function POST(req: NextRequest) {
         .upsert(row, { onConflict: "proposal_id,voter" })
         .select()
         .single());
+    }
+
+    // votes_proposal_identity_key: the same person has already voted here from
+    // another wallet. The index is what refuses it; this explains the refusal.
+    if (error?.code === "23505" && /identity_key/.test(error.message ?? "")) {
+      return NextResponse.json(
+        { error: "You have already voted on this proposal from another wallet." },
+        { status: 409 }
+      );
     }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

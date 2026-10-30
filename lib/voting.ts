@@ -1,4 +1,4 @@
-import { countIdentities, identityKey } from "./identity";
+import { countIdentities, countSelfVerified, identityKey } from "./identity";
 import type {
   PairwiseResult,
   TallyResult,
@@ -339,6 +339,7 @@ export function tally(
   const identityCount = countIdentities(votes);
   const identityQuorumReached =
     identityQuorum <= 0 || identityCount >= identityQuorum;
+  const selfVerifiedCount = countSelfVerified(votes);
 
   if (system === "copeland") {
     const { scores, pairwise, ranking, winner } = tallyCopeland(votes, choiceCount);
@@ -355,6 +356,7 @@ export function tally(
       voterCount,
       identityCount,
       identityQuorumReached,
+      selfVerifiedCount,
       participation,
       scoreUnit: "wins",
       quorumReached: quorum <= 0 || participation >= quorum,
@@ -373,6 +375,7 @@ export function tally(
       voterCount,
       identityCount,
       identityQuorumReached,
+      selfVerifiedCount,
       participation: total,
       scoreUnit: "power",
       quorumReached: quorum <= 0 || total >= quorum,
@@ -407,6 +410,7 @@ export function tally(
     voterCount,
     identityCount,
     identityQuorumReached,
+    selfVerifiedCount,
     participation,
     scoreUnit: "power",
     quorumReached: quorum <= 0 || participation >= quorum,
@@ -457,7 +461,7 @@ export function tallyByIdentity(
   const latest = new Map<string, Vote>();
 
   for (const vote of votes) {
-    const key = identityKey(vote.voter);
+    const key = identityKey(vote);
     const held = latest.get(key);
     if (!held || ballotTime(vote) > ballotTime(held)) latest.set(key, vote);
   }

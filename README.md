@@ -147,6 +147,58 @@ unqueryable, and the portal needs mutable state — open proposals, running
 tallies, the replay floor, rate limits. Snapshot is built the same way: IPFS
 receipts alongside its own centralised hub.
 
+## One person, one vote with Self
+
+Redbelly's access contract proves a wallet belongs to a verified person, but
+one credential enables about ten wallets and nothing on chain links them. Self
+closes most of that gap from outside the chain.
+
+A member opens their profile, signs a message (proving the wallet is theirs),
+and scans an identity document in the free [Self app](https://play.google.com/store/apps/details?id=com.proofofpassportapp):
+a passport, a chip national ID such as Pakistan's NIC, or Aadhaar. Self
+returns a nullifier, a number that is the same every time the same document
+proves itself to this portal and reveals nothing else. Each nullifier binds to
+one wallet and each wallet to one nullifier; a second wallet with the same
+document is refused. Nothing is disclosed: no name, no date of birth, no
+nationality.
+
+- **Every ballot** from a bound wallet is stamped with that binding, and the
+  results panel shows how many voters were verified as one person.
+- **Strict proposals** (`require_unique`, a checkbox on the create page) count
+  only wallets bound before the proposal was created, so the electorate is
+  frozen like a snapshot block.
+
+The honest ceiling is now documents per person, not wallets per credential:
+Self derives one nullifier per document, so someone holding both a passport and
+a NIC can bind two wallets. Members without a supported document can still vote
+on ordinary proposals as one verified address.
+
+Setup: run `supabase/migrations/012_personhood.sql`, set `NEXT_PUBLIC_SELF_SCOPE`,
+and deploy. The Self app posts proofs from the member's phone, so the endpoint
+must be public HTTPS; test on a Vercel preview with `NEXT_PUBLIC_SITE_URL` set,
+not on localhost. `NEXT_PUBLIC_SELF_MOCK=true` accepts Self's mock documents for
+rehearsal; production deployments ignore it. Use a separate scope on previews
+(e.g. `redbelly-dao-test`) so a rehearsal with a real document does not spend
+that document's production nullifier.
+
+Moving a member to a new wallet is an admin job, on purpose: a self-service
+switch would let one document vote from a fresh wallet on every proposal.
+Update the row in place rather than deleting it, so the binding keeps its id
+and `bound_at` and the `votes_proposal_identity_key` index still stops the
+same person voting twice on an open proposal:
+
+```sql
+update personhood_bindings set address = lower('0xNEW…') where address = lower('0xOLD…');
+```
+
+Delete a row only to undo a test binding.
+
+This uses Self's open-source SDK (`@selfxyz/core`, `@selfxyz/qrcode`), which
+verifies proofs against Self's contracts on Celo with no account or fee. Self
+now labels it legacy in favour of a hosted, credit-billed Enterprise API. It
+works today; if Self retires it, the swap is confined to `lib/personhood.ts`,
+`app/api/personhood/` and `components/personhood-card.tsx`.
+
 ## Testing one person, one vote locally
 
 On mainnet `verified-identity` reads Redbelly's access contract and no local

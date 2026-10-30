@@ -10,6 +10,7 @@ import { currentBlock, getVotingPower } from "@/lib/voting-power";
 import { LIMITS, dayAgo, PROPOSAL_THRESHOLD } from "@/lib/limits";
 import { VOTING_SYSTEMS } from "@/lib/voting";
 import { resultsFor } from "@/lib/results";
+import { personhoodEnabled } from "@/lib/personhood-config";
 import type { Proposal, Vote } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -108,13 +109,22 @@ export async function GET(req: NextRequest) {
 
   // One read for every ballot in the space rather than a query per proposal.
   // At DAO scale (hundreds of votes) this is cheaper than the round trips.
-  const { data: voteRows } = await db
+  const ids = proposals.map((p) => p.id);
+  const withKeys = await db
     .from("votes")
-    .select("proposal_id, voter, choice, voting_power")
-    .in(
-      "proposal_id",
-      proposals.map((p) => p.id)
-    );
+    .select("proposal_id, voter, choice, voting_power, identity_key")
+    .in("proposal_id", ids);
+  let voteRows = withKeys.data;
+
+  // identity_key arrives with migration 012. Until then, count by address as
+  // before rather than showing every proposal with no votes at all.
+  if (withKeys.error && isMissingColumn(withKeys.error)) {
+    const plain = await db
+      .from("votes")
+      .select("proposal_id, voter, choice, voting_power")
+      .in("proposal_id", ids);
+    voteRows = plain.data as typeof voteRows;
+  }
 
   const byProposal = new Map<string, Vote[]>();
   for (const v of (voteRows ?? []) as Vote[]) {
@@ -237,6 +247,23 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // Strict one person, one vote stands on the Redbelly gate: a Self binding
+    // says "this verified wallet is this person's only one", which says
+    // nothing about a wallet that was never verified.
+    const requireUnique = !!message.requireUnique;
+    if (requireUnique && !personhoodEnabled) {
+      return NextResponse.json(
+        { error: "One person, one vote needs Self verification, which is not set up here." },
+        { status: 400 }
+      );
+    }
+    if (requireUnique && !message.requireVerified) {
+      return NextResponse.json(
+        { error: "One person, one vote needs identity-gated voting as well." },
+        { status: 400 }
+      );
+    }
+
     if (identityQuorum > 0 && !message.requireVerified) {
       return NextResponse.json(
         {
@@ -351,9 +378,26 @@ export async function POST(req: NextRequest) {
       signed_at: Number(message.timestamp),
     };
     if (screeningId) row.screening_id = screeningId;
+    // Only sent when asked for, so a deployment that has not run migration
+    // 012 keeps publishing every other proposal exactly as before.
+    if (requireUnique) row.require_unique = true;
 
     const db = supabaseAdmin();
     let { data, error } = await db.from("proposals").insert(row).select().single();
+
+    // A term the author asked for is never dropped to make the insert fit.
+    // Publishing a strict vote as an ordinary one would count wallets the
+    // author meant to exclude, so this refuses instead.
+    if (error && isMissingColumn(error) && /require_unique/.test(error.message ?? "")) {
+      return NextResponse.json(
+        {
+          error:
+            "One person, one vote is not available until migration 012 has " +
+            "been run. Publish without it, or ask an operator to run it.",
+        },
+        { status: 503 }
+      );
+    }
 
     // screening_id (011) is only sent when there is one, and there can only be
     // one once 011's table exists, so this is the rare deployment that ran the

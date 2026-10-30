@@ -78,6 +78,12 @@ export interface Proposal {
    * separate questions.
    */
   identity_quorum: number;
+  /**
+   * Strict one person, one vote: only wallets bound to a Self identity before
+   * the proposal was created may vote. Implies `require_verified`. Not part of
+   * the signed payload, like `identity_quorum`; see migration 012.
+   */
+  require_unique?: boolean;
   start_at: string;
   end_at: string;
   created_at: string;
@@ -144,6 +150,12 @@ export interface Vote {
    * ballots cast before migration 006 and on imported history.
    */
   signed_at: number | null;
+  /**
+   * The Self identity behind this ballot, stamped when it was cast: the
+   * binding's id, never the nullifier. Null for unbound wallets and for all
+   * history before migration 012. Read through `identityKey`.
+   */
+  identity_key?: string | null;
   created_at: string;
 
   source?: "native" | "snapshot";
@@ -184,6 +196,12 @@ export interface TallyResult {
   identityCount: number;
   /** True when the proposal asks for no identity quorum. */
   identityQuorumReached: boolean;
+  /**
+   * Ballots cast from wallets bound to a Self identity (migration 012). Shown
+   * beside `voterCount` so the DAO can see how much of a vote is counted per
+   * person rather than per verified address. Absent on imported results.
+   */
+  selfVerifiedCount?: number;
   voterCount: number;
   /**
    * Voting power actually cast, counting each voter once.

@@ -7,6 +7,7 @@ import {
   snapshotDrift,
   MAX_SNAPSHOT_DRIFT_SECONDS,
 } from "@/lib/voting-power";
+import { bindingFor, boundInTime } from "@/lib/personhood";
 import type { Proposal } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,22 @@ export async function GET(req: NextRequest) {
           unavailable:
             "This proposal is open to identity-verified wallets only. This " +
             "address does not hold a Receptor credential on Redbelly.",
+        });
+      }
+    }
+
+    if (proposal.require_unique) {
+      const lookup = await bindingFor(voter);
+      const binding = lookup.state === "bound" ? lookup.binding : null;
+      if (!binding || !boundInTime(binding, proposal)) {
+        return NextResponse.json({
+          power: 0,
+          blocked: true,
+          unavailable: binding
+            ? "This proposal counts one vote per person. This wallet was " +
+              "verified with Self after it opened, so it can vote on the next one."
+            : "This proposal counts one vote per person. Verify this wallet " +
+              "with Self from your profile to vote on proposals created after that.",
         });
       }
     }

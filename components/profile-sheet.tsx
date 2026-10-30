@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AddressAvatar } from "@/components/address-avatar";
+import { PersonhoodCard } from "@/components/personhood-card";
 import { domain, profileTypes, buildProfileMessage } from "@/lib/eip712";
 import { PROFILE_LIMITS } from "@/lib/profile-fields";
 import { useProfile } from "@/lib/use-profiles";
@@ -272,6 +273,8 @@ export function ProfileSheet({
               />
             </div>
           </div>
+
+          <PersonhoodCard />
 
           <p className="text-xs text-muted-foreground">
             Your address is shown next to your name everywhere it appears. A

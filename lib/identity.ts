@@ -7,8 +7,14 @@ import type { Vote } from "./types";
  * exists so there is exactly one line to change on the day the protocol can
  * answer the question properly.
  *
- * Today that line lowercases an address, so the count is a count of verified
- * addresses. That is not the same as a count of humans: one Redbelly
+ * For a wallet bound to a Self identity (migration 012) the key is that
+ * binding, stamped on the ballot when it was cast. Self derives one nullifier
+ * per identity document and each may be bound to one wallet, so for those
+ * voters the ceiling drops from "wallets per credential" to "documents per
+ * person", which is one or two. Everyone else falls back to their address.
+ *
+ * For an unbound wallet the key lowercases an address, so the count is a
+ * count of verified addresses. That is not the same as a count of humans: one Redbelly
  * credential enables several addresses — measured at roughly ten — and
  * nothing in `PermissionUpgradeable` groups addresses by the identity behind
  * them, so a holder of several credentialed wallets is counted several times.
@@ -31,8 +37,10 @@ import type { Vote } from "./types";
  * written against the key rather than the address, precisely so that swap
  * stays a one-line swap.
  */
-export function identityKey(voter: string): string {
-  return voter.trim().toLowerCase();
+export function identityKey(vote: Pick<Vote, "voter" | "identity_key">): string {
+  // Prefixed so a binding id can never collide with an address.
+  if (vote.identity_key) return `self:${vote.identity_key}`;
+  return vote.voter.trim().toLowerCase();
 }
 
 /**
@@ -43,10 +51,19 @@ export function identityKey(voter: string): string {
  * collapse a person's several addresses into one — which is the whole point
  * of counting this way before that happens rather than after.
  */
-export function countIdentities(votes: Pick<Vote, "voter">[]): number {
+export function countIdentities(
+  votes: Pick<Vote, "voter" | "identity_key">[]
+): number {
   const seen = new Set<string>();
-  for (const vote of votes) seen.add(identityKey(vote.voter));
+  for (const vote of votes) seen.add(identityKey(vote));
   return seen.size;
+}
+
+/** Ballots cast from a wallet bound to a Self identity. */
+export function countSelfVerified(
+  votes: Pick<Vote, "identity_key">[]
+): number {
+  return votes.filter((v) => !!v.identity_key).length;
 }
 
 /**

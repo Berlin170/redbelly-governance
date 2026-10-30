@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, MessageSquare, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageSquare, ShieldCheck, UserCheck } from "lucide-react";
 import { VotePanel } from "@/components/vote-panel";
 import { ResultsPanel } from "@/components/results-panel";
 import { VotersTable } from "@/components/voters-table";
@@ -257,6 +257,23 @@ export default function ProposalPage({
                 <TooltipContent className="max-w-xs">
                   Only wallets holding a Receptor credential can vote on this
                   proposal.
+                </TooltipContent>
+              </Tooltip>
+            </>
+          )}
+          {proposal.require_unique && (
+            <>
+              <span aria-hidden className="text-muted-foreground/45">·</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex cursor-help items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs">
+                    <UserCheck className="size-3 text-primary" />
+                    One vote per person
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  Only wallets verified as one person with the Self app before
+                  this proposal opened can vote, one wallet per person.
                 </TooltipContent>
               </Tooltip>
             </>
