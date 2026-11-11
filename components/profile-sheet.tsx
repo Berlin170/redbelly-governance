@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AddressAvatar } from "@/components/address-avatar";
 import { PersonhoodCard } from "@/components/personhood-card";
 import { domain, profileTypes, buildProfileMessage } from "@/lib/eip712";
+import { personhoodEnabled } from "@/lib/personhood-config";
 import { PROFILE_LIMITS } from "@/lib/profile-fields";
 import { useProfile } from "@/lib/use-profiles";
 import { shortAddress } from "@/lib/utils";
@@ -161,6 +162,19 @@ export function ProfileSheet({
             </div>
           </div>
 
+          {/* Above the form, not inside it. Verifying is its own action with
+              its own signature, and nothing below has to be saved for it to
+              count; among the fields it read as one more of them. Members are
+              also sent here by name ("verify from your profile"), so it is the
+              first thing they should find. */}
+          <PersonhoodCard />
+
+          {personhoodEnabled && (
+            <p className="border-t border-border pt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Profile details
+            </p>
+          )}
+
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
               <Label htmlFor="display-name">Display name</Label>
@@ -273,8 +287,6 @@ export function ProfileSheet({
               />
             </div>
           </div>
-
-          <PersonhoodCard />
 
           <p className="text-xs text-muted-foreground">
             Your address is shown next to your name everywhere it appears. A

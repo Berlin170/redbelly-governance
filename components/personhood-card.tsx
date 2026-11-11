@@ -123,24 +123,34 @@ export function PersonhoodCard() {
   }
 
   if (status.data?.bound) {
+    const when = status.data.boundAt
+      ? new Date(status.data.boundAt).toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : "";
     return (
+      // Done is a fact, not a task, so it takes a line rather than a card's
+      // worth of the sheet. The terms are still one click away.
       <div className="flex items-start gap-3 rounded-lg border border-border p-3.5">
         <UserCheck className="mt-0.5 size-4 shrink-0 text-status-passed" />
-        <div className="space-y-1 text-sm">
+        <div className="min-w-0 space-y-1 text-sm">
           <p className="font-medium">Verified as one person</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             With your {status.data.document} via Self
-            {status.data.boundAt
-              ? ` on ${new Date(status.data.boundAt).toLocaleString(undefined, {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                })}`
-              : ""}
-            . This is permanent: this wallet can vote on one person, one vote
-            proposals created after that time, as long as it still holds its
-            Receptor credential. To move it to another wallet, ask a space
-            admin.
+            {when ? ` on ${when}` : ""}.
           </p>
+          <details>
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+              What this means
+            </summary>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              This is permanent: this wallet can vote on one person, one vote
+              proposals created after that time, as long as it still holds its
+              Receptor credential. To move it to another wallet, ask a space
+              admin.
+            </p>
+          </details>
         </div>
       </div>
     );
@@ -156,6 +166,10 @@ export function PersonhoodCard() {
           phone: the portal only learns that this document has not verified
           another wallet. One document, one wallet.
         </p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Your wallet asks for a signature first, to show the wallet is yours.
+          It costs no gas, and you do not need to save your profile.
+        </p>
       </div>
 
       {status.isError && (
@@ -168,7 +182,7 @@ export function PersonhoodCard() {
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={start} disabled={starting}>
             {starting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            {starting ? "Waiting for signature" : "Sign and verify with Self"}
+            {starting ? "Waiting for signature" : "Verify with Self"}
           </Button>
           <a
             href={GET_SELF}
