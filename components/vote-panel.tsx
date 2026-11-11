@@ -94,7 +94,12 @@ function WalletVotePanel({
       if (typeof json.power !== "number" || !Number.isFinite(json.power)) {
         throw new Error("Voting power could not be read. Please try again.");
       }
-      return json as { power: number; unavailable?: string; blocked?: boolean };
+      return json as {
+        power: number;
+        unavailable?: string;
+        blocked?: boolean;
+        gate?: "personhood";
+      };
     },
   });
   const power = eligibility.data?.power ?? null;
@@ -256,7 +261,9 @@ function WalletVotePanel({
                   : "This address held no voting power at the proposal snapshot. Connect a wallet that held eligible assets at that time.")}</p>
               )}
               {powerNote && (
-                <p className="text-muted-foreground">{eligibility.data?.blocked
+                <p className="text-muted-foreground">{eligibility.data?.gate === "personhood"
+                  ? "Or connect a wallet that was verified with Self before this proposal opened."
+                  : eligibility.data?.blocked
                   ? "Connect an address that was verified at the proposal snapshot."
                   : "Try checking again. If this continues, contact the proposal organizer."}</p>
               )}

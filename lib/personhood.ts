@@ -62,6 +62,23 @@ export function boundInTime(
   return new Date(binding.bound_at).getTime() <= new Date(proposal.created_at).getTime();
 }
 
+/**
+ * Why a wallet may not vote on a strict proposal, in the member's words.
+ *
+ * One sentence, used by both the eligibility check and the vote endpoint, so
+ * what a member reads before signing is what they are told if they sign
+ * anyway.
+ */
+export function uniqueRefusal(binding: PersonhoodBinding | null): string {
+  return binding
+    ? "This is a one person, one vote proposal. This wallet was verified " +
+        "with Self after it opened, so it can vote on the next one."
+    : "This is a one person, one vote proposal, open to Self-verified " +
+        "wallets only. Verify this wallet with Self from your profile. You " +
+        "only do it once, and it applies to proposals created after you " +
+        "verify. Normal proposals are not affected.";
+}
+
 let verifier: SelfBackendVerifier | null = null;
 
 /**

@@ -24,9 +24,10 @@ Run `schema.sql` first, then `migrations/` in numeric order.
 | `migrations/009_avatar_uploads_rls.sql` | RLS on `avatar_uploads`, no policy | yes |
 | `migrations/010_identity_quorum.sql` | `proposals.identity_quorum` | yes |
 | `migrations/011_proposal_screening.sql` | `proposal_screenings`, `proposals.screening_id` | yes |
-| `migrations/012_personhood.sql` | Self sessions and bindings, `votes.identity_key`, `proposals.require_unique` | no |
+| `migrations/012_personhood.sql` | Self sessions and bindings, `votes.identity_key`, `proposals.require_unique` | yes |
+| `migrations/013_personhood_audit.sql` | `personhood_binding_log`, its triggers, `move_personhood_binding()` | yes |
 
-Everything through 011 is live in production. Nothing here is taken on trust:
+Everything through 013 is live in production. Nothing here is taken on trust:
 each was verified by reading something that only exists if the migration ran.
 
 - **000-008**, verified 2026-08-30: every native proposal carries both a
@@ -38,6 +39,14 @@ each was verified by reading something that only exists if the migration ran.
 - **010**, verified 2026-09-01: `identity_quorum` selects, and reads 0 on all 37
   proposals with no nulls, so nothing already open had a threshold introduced
   underneath it.
+- **012**, verified 2026-11-11: `/api/personhood?address=…` on production
+  answers `enabled: true`. With `personhood_bindings` missing it answers
+  `enabled: false`.
+
+- **013**, verified 2026-11-11: `personhood_binding_log` selects (empty) with
+  the service key, and `move_personhood_binding` called with a malformed
+  address answers with its own "not a valid address" error, which only the
+  function can produce. The call changes nothing: it fails before the update.
 
 Both checks are runnable without the SQL editor, which matters because the key
 in use here writes rows but cannot run DDL. From the SQL editor the equivalents
@@ -65,7 +74,7 @@ reference to them by number.
 
 ## Adding one
 
-Next number is `013`. Put it in `migrations/`, make it idempotent
+Next number is `014`. Put it in `migrations/`, make it idempotent
 (`add column if not exists`, `create table if not exists`) so a re-run is
 harmless, and make the code tolerate its absence until it is applied —
 `isMissingColumn` in `lib/pg-errors.ts` is how the proposal route degrades to

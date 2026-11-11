@@ -7,7 +7,7 @@ import {
   snapshotDrift,
   MAX_SNAPSHOT_DRIFT_SECONDS,
 } from "@/lib/voting-power";
-import { bindingFor, boundInTime } from "@/lib/personhood";
+import { bindingFor, boundInTime, uniqueRefusal } from "@/lib/personhood";
 import type { Proposal } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -79,11 +79,10 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
           power: 0,
           blocked: true,
-          unavailable: binding
-            ? "This proposal counts one vote per person. This wallet was " +
-              "verified with Self after it opened, so it can vote on the next one."
-            : "This proposal counts one vote per person. Verify this wallet " +
-              "with Self from your profile to vote on proposals created after that.",
+          // Which gate refused, so the panel does not answer a Self refusal
+          // with advice about the Redbelly credential.
+          gate: "personhood",
+          unavailable: uniqueRefusal(binding),
         });
       }
     }

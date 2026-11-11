@@ -12,7 +12,12 @@ import {
   MAX_SNAPSHOT_DRIFT_SECONDS,
 } from "@/lib/voting-power";
 import { validateChoice } from "@/lib/voting";
-import { bindingFor, boundInTime, type PersonhoodBinding } from "@/lib/personhood";
+import {
+  bindingFor,
+  boundInTime,
+  uniqueRefusal,
+  type PersonhoodBinding,
+} from "@/lib/personhood";
 import { LIMITS, MAX_CLOCK_SKEW_SECONDS } from "@/lib/limits";
 
 export const dynamic = "force-dynamic";
@@ -198,15 +203,7 @@ export async function POST(req: NextRequest) {
 
     if (proposal.require_unique && (!binding || !boundInTime(binding, proposal))) {
       return NextResponse.json(
-        {
-          error: binding
-            ? "This proposal counts one vote per person, and this wallet was " +
-              "verified with Self after the proposal opened. It can vote on " +
-              "the next one."
-            : "This proposal counts one vote per person. Verify this wallet " +
-              "with Self from your profile first. It applies to proposals " +
-              "created after you verify.",
-        },
+        { error: uniqueRefusal(binding) },
         { status: 403 }
       );
     }

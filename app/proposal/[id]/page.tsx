@@ -268,7 +268,7 @@ export default function ProposalPage({
                 <TooltipTrigger asChild>
                   <span className="inline-flex cursor-help items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs">
                     <UserCheck className="size-3 text-primary" />
-                    One vote per person
+                    One person, one vote
                   </span>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">

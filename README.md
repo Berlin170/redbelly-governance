@@ -185,13 +185,24 @@ Moving a member to a new wallet is an admin job, on purpose: a self-service
 switch would let one document vote from a fresh wallet on every proposal.
 Update the row in place rather than deleting it, so the binding keeps its id
 and `bound_at` and the `votes_proposal_identity_key` index still stops the
-same person voting twice on an open proposal:
+same person voting twice on an open proposal. With migration 013 applied, use
+the helper, which does exactly that and records why:
 
 ```sql
-update personhood_bindings set address = lower('0xNEW…') where address = lower('0xOLD…');
+select move_personhood_binding('0xOLD…', '0xNEW…', 'Lost wallet, asked in Discord by …');
 ```
 
 Delete a row only to undo a test binding.
+
+Moves and deletions are the only way around one person, one vote, so migration
+013 records every one of them in `personhood_binding_log`, by trigger, however
+the change is made. A plain `update` or a delete from the table editor is
+logged too, only without a reason. Review it from the SQL editor:
+
+```sql
+select changed_at, action, old_address, new_address, reason
+  from personhood_binding_log order by changed_at desc;
+```
 
 This uses Self's open-source SDK (`@selfxyz/core`, `@selfxyz/qrcode`), which
 verifies proofs against Self's contracts on Celo with no account or fee. Self

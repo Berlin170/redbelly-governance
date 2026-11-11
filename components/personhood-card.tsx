@@ -131,10 +131,15 @@ export function PersonhoodCard() {
           <p className="text-xs leading-relaxed text-muted-foreground">
             With your {status.data.document} via Self
             {status.data.boundAt
-              ? ` on ${new Date(status.data.boundAt).toLocaleDateString()}`
+              ? ` on ${new Date(status.data.boundAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}`
               : ""}
-            . You can vote on one-person-one-vote proposals created after that
-            date. To move this to another wallet, ask a space admin.
+            . This is permanent: this wallet can vote on one person, one vote
+            proposals created after that time, as long as it still holds its
+            Receptor credential. To move it to another wallet, ask a space
+            admin.
           </p>
         </div>
       </div>
@@ -196,7 +201,8 @@ export function PersonhoodCard() {
             <a href={universalLink} className="text-primary hover:underline">
               Open the Self app
             </a>{" "}
-            instead. The code works once and expires in 15 minutes.
+            instead. This QR code works once and expires in 15 minutes; the
+            verification itself is permanent, so you only do this once.
           </p>
           <Button size="sm" variant="ghost" onClick={() => setSelfApp(null)}>
             Cancel
